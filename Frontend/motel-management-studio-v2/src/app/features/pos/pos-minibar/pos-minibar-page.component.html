@@ -1,0 +1,91 @@
+<section class="pos-screen">
+  @if (surfaceNotice(); as notice) {
+    <button class="surface-notice" type="button" (click)="surfaceNotice.set(null)" aria-label="Cerrar aviso">
+      <span>{{ notice }}</span><rms-cazo-icon name="close" [size]="15" />
+    </button>
+  }
+
+  <div class="workspace">
+    <main class="catalog" aria-label="Catálogo del minibar">
+      <div class="catalog__toolbar">
+        <label class="search-field">
+          <rms-cazo-icon name="search" [size]="20" />
+          <span class="sr-only">Buscar producto</span>
+          <input [formControl]="search" type="search" placeholder="Buscar producto, código o categoría…" />
+        </label>
+        <span class="catalog-count">{{ catalogCount() }} de {{ catalogTotal() }} productos</span>
+      </div>
+
+      <div class="category-row category-row--picker" aria-label="Categorías del minibar">
+        <rms-combobox [ngModelOptions]="{ standalone: true }" class="category-picker" ariaLabel="Filtrar por categoría" placeholder="Todas las categorías" emptyText="No hay categorías con ese nombre"
+          [options]="categoryOptions()" [ngModel]="categoryId()" (ngModelChange)="setCategory($event)" />
+      </div>
+
+      <div class="catalog__body">
+        @if (errorMessage(); as message) {
+          <div class="state state--error"><span class="state__icon">!</span><strong>No pudimos abrir el minibar</strong><p>{{ message }}</p><button type="button" class="state__retry" (click)="loadCatalog()">Reintentar</button></div>
+        } @else if (loading() && catalog().length === 0) {
+          <div class="state" role="status"><span class="spinner"></span><strong>Cargando minibar</strong><p>Consultando productos con stock disponible.</p></div>
+        } @else if (filteredProducts().length === 0 && !loading()) {
+          <div class="state"><span class="state__icon"><rms-cazo-icon name="search" [size]="23" /></span><strong>Sin productos disponibles</strong><p>El minibar solo muestra productos activos con stock; prueba otro término o <button type="button" class="state__link" (click)="search.setValue(''); setCategory(null)">quita los filtros</button>.</p></div>
+        } @else {
+          <div class="product-grid" [class.is-loading]="loading()" [attr.aria-busy]="loading()">
+            @for (product of filteredProducts(); track product.productId) {
+              <button class="product" type="button" (click)="addProduct(product)" [disabled]="!product.isActive || product.currentStock <= 0">
+                <span class="product__media">
+                  <img [src]="productImage(product)" [alt]="product.name" loading="lazy" decoding="async" fetchpriority="low" />
+                  @if (product.isLowStock || product.currentStock <= product.minStock) {
+                    <span class="product__badge">POCO STOCK</span>
+                  }
+                </span>
+                <span class="product__content">
+                  <strong>{{ product.name }}</strong>
+                  <small><i aria-hidden="true"></i>{{ product.categoryName || 'Sin categoría' }}</small>
+                  @if (product.description?.trim(); as description) { <span class="product__description">{{ description }}</span> }
+                  <span class="product__stock">Stock · {{ product.currentStock }} {{ product.unitOfMeasure }}</span>
+                  <span class="product__price">{{ product.salePrice | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</span>
+                </span>
+                <span class="product__add" aria-hidden="true">
+                  <rms-cazo-icon name="plus" [size]="18" />
+                </span>
+              </button>
+            }
+          </div>
+          @if (catalogHasMore()) {
+            <div class="catalog__more">
+              <button type="button" class="rms-btn rms-btn--secondary" [disabled]="loading()" (click)="loadMoreCatalog()">
+                @if (loading()) { <span class="spinner"></span> Cargando… } @else { Cargar más productos ({{ catalog().length }} de {{ catalogTotal() }}) }
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </main>
+
+    <rms-pos-ticket
+      [lines]="cart()"
+      [total]="cartTotal()"
+      [saving]="loadingCart()"
+      [destinationRoomStayId]="destinationRoomStayId()"
+      [destinationLabel]="destinationLabel()"
+      [roomsOpen]="openRooms().length"
+      [roomOptions]="roomOptions()"
+      (quantityChange)="changeQuantity($event)"
+      (removed)="removeLine($event)"
+      (noteChanged)="changeLineNote($event.productId, $event.note)"
+      (cleared)="clearCart()"
+      (destinationChange)="destinationRoomStayId.set($event)"
+      (checkout)="loadCart()" />
+  </div>
+</section>
+
+@if (paymentOpen() && paymentStay(); as stay) {
+  <rms-pos-payment-modal
+    [stay]="stay"
+    [roomLabel]="destinationLabel() ?? ('Estancia #' + stay.stay.roomStayId)"
+    [currencyRates]="currencyRates()"
+    [submitting]="checkoutSubmitting()"
+    [errorMessage]="paymentError()"
+    (closed)="closePayment()"
+    (confirmed)="onCheckoutConfirmed($event)" />
+}

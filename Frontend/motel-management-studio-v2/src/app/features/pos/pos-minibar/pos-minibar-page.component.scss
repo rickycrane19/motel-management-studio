@@ -1,0 +1,118 @@
+/* Port literal de la cuadrícula del pos-sales-workspace del restaurante v2.
+   La paleta la aportan los tokens `--cazo-*`; los acentos rgba(194 83 57 …)
+   del diseño se resuelven con color-mix sobre --cazo-brand, como en el resto
+   de parciales portados de _payment/_products. */
+
+:host { height: 100%; min-height: 0; display: block; }
+
+.pos-screen { position: relative; height: 100%; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
+.workspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 410px; gap: 14px; }
+
+.catalog {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgb(194 83 57 / 17%);
+  border-radius: 18px;
+  color: var(--cazo-ink);
+  background: var(--cazo-bg);
+}
+
+.catalog__toolbar { display: grid; grid-template-columns: minmax(280px, 1fr) 168px; gap: 12px; padding: 13px 16px 8px; }
+.search-field { min-width: 0; height: 44px; display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 5px; padding: 0 13px; border: 1px solid rgb(194 83 57 / 25%); border-radius: 12px; color: var(--cazo-ink); }
+.search-field input { min-width: 0; width: 100%; border: 0; outline: 0; color: var(--cazo-ink); background: transparent; font-size: 12px; }
+.search-field input::placeholder { color: var(--cazo-muted); }
+
+.category-row { min-width: 0; display: grid; padding: 4px 16px 14px; }
+.category-row--picker { display: grid; grid-template-columns: minmax(220px, 360px); align-items: center; }
+.category-picker { min-width: 0; display: block; }
+.catalog-count { align-self: center; color: var(--cazo-muted); font-size: 11px; text-align: right; }
+.catalog__more { display: flex; justify-content: center; padding: 10px 0 4px; }
+
+.catalog__body { min-height: 0; display: grid; align-content: start; gap: 13px; overflow-y: auto; padding: 6px 16px 16px; scrollbar-width: thin; scrollbar-color: rgb(194 83 57 / 35%) transparent; }
+.product-grid.is-loading { opacity: .5; transition: opacity .15s ease; pointer-events: none; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; }
+
+/* Tarjeta de producto (port del rms-pos-product-card del restaurante). */
+.product {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgb(194 83 57 / 17%);
+  border-radius: 14px;
+  color: var(--cazo-ink);
+  background: var(--cazo-bg);
+  box-shadow: 0 7px 18px rgb(52 37 31 / 9%);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+.product:hover:not(:disabled) { border-color: rgb(194 83 57 / 62%); box-shadow: 0 10px 22px rgb(52 37 31 / 13%); transform: translateY(-2px); }
+.product:active:not(:disabled) { transform: translateY(0); }
+.product:disabled { cursor: not-allowed; opacity: 0.62; }
+
+.product__media { position: relative; display: block; height: 132px; overflow: hidden; background: var(--cazo-soft); }
+.product__media::after { content: ''; position: absolute; inset: 38% 0 0; pointer-events: none; background: linear-gradient(180deg, transparent, rgb(52 37 31 / 27%)); }
+.product__media img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.product__badge { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 5px 9px; border-radius: 999px; color: #fff; background: var(--cazo-brand); font-size: 9px; font-weight: 800; letter-spacing: 0.03em; }
+
+.product__content { min-height: 100px; display: grid; align-content: start; gap: 5px; padding: 11px 48px 12px 12px; }
+.product__content strong { overflow: hidden; font-family: 'Outfit Variable', Outfit, 'Segoe UI', sans-serif; font-size: 14px; font-weight: 650; line-height: 1.15; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.product__description { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--cazo-muted); font-size: 10px; line-height: 1.3; }
+.product__content small { overflow: hidden; color: var(--cazo-muted); font-size: 9px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.product__content small i { width: 5px; height: 5px; display: inline-block; margin-right: 5px; border-radius: 50%; background: var(--cazo-brand); vertical-align: 1px; }
+.product__stock { overflow: hidden; color: var(--cazo-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.product__price { color: var(--cazo-brand); font-family: 'Outfit Variable', Outfit, 'Segoe UI', sans-serif; font-size: 16px; line-height: 1; }
+
+.product__add { position: absolute; right: 9px; bottom: 8px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: #fff; background: var(--cazo-brand); box-shadow: 0 5px 10px rgb(194 83 57 / 26%); }
+.product:focus-visible { outline: 3px solid var(--cazo-brand); outline-offset: 3px; }
+
+.state { min-height: 280px; display: grid; place-content: center; justify-items: center; padding: 24px; text-align: center; }
+.state strong { margin-top: 11px; font: 650 15px 'Outfit Variable', Outfit, sans-serif; }
+.state p { max-width: 370px; margin: 5px 0 0; color: var(--cazo-muted); font-size: 10px; line-height: 1.5; }
+.state--error { color: #923c2a; }
+.state__retry, .state__link { border: 0; color: var(--cazo-brand); background: transparent; font-weight: 700; cursor: pointer; text-decoration: underline; }
+.state__retry { margin-top: 12px; padding: 8px 18px; border-radius: 10px; color: #fff; background: var(--cazo-brand); text-decoration: none; }
+.state__icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: var(--cazo-brand); background: var(--cazo-soft); font: 750 18px 'Outfit Variable', Outfit, sans-serif; }
+.spinner { width: 32px; height: 32px; border: 3px solid rgb(194 83 57 / 18%); border-top-color: var(--cazo-brand); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.surface-notice { position: absolute; z-index: 20; top: 82px; right: 426px; max-width: 390px; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid rgb(194 83 57 / 25%); border-radius: 12px; color: var(--cazo-ink); background: var(--cazo-surface); box-shadow: 0 10px 28px rgb(52 37 31 / 14%); font-size: 10px; cursor: pointer; }
+.surface-notice span { flex: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+
+@media (max-height: 760px) and (min-width: 901px) {
+  .pos-screen { height: auto; min-height: calc(100dvh - 112px); grid-template-rows: minmax(560px, auto); }
+  .workspace { min-height: 560px; }
+  .catalog { min-height: 560px; overflow: visible; }
+  .catalog__body { min-height: 350px; overflow: visible; align-content: start; }
+  rms-pos-ticket { min-height: 560px; }
+}
+
+@media (max-width: 1350px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) 370px; }
+  .surface-notice { right: 386px; }
+}
+
+@media (max-width: 1080px) {
+  :host { height: auto; }
+  .pos-screen { height: auto; min-height: 100%; grid-template-rows: auto; }
+  .workspace { grid-template-columns: 1fr; }
+  .catalog { min-height: 700px; }
+  rms-pos-ticket { min-height: 700px; }
+  .surface-notice { position: fixed; top: 90px; right: 20px; }
+}
+
+@media (max-width: 680px) {
+  .catalog__toolbar, .category-row { grid-template-columns: 1fr; }
+  .catalog-count { justify-self: start; }
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product, .spinner { animation: none; transition: none; }
+}

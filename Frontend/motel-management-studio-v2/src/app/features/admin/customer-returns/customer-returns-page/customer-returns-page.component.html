@@ -1,0 +1,89 @@
+<section class="rms-page returns-stack">
+  <rms-page-header eyebrow="INVENTARIO" title="Devoluciones de clientes"
+    subtitle="Cuando un cliente devuelve productos: el stock reingresa y el reembolso en efectivo sale de la caja del turno.">
+    <ng-container actions>
+      <a class="rms-btn rms-btn--primary" routerLink="nueva" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Registrar devolución</a>
+    </ng-container>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de inventario">Tu rol no puede consultar devoluciones de clientes. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar lo que ya cargó. Para registrar una devolución necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de devoluciones">
+      <rms-stat-card label="Devoluciones" [value]="store.stats().documents" hint="En las fechas elegidas" icon="swap" tone="brand" [loading]="store.status() === 'loading' && store.customerReturns().length === 0" />
+      <rms-stat-card label="Reembolsado" [value]="store.stats().refundedAmount" hint="Dinero que salió de caja (C$)" icon="cash" [loading]="store.status() === 'loading' && store.customerReturns().length === 0" />
+    </div>
+
+    <rms-filter-bar [placeholder]="'Buscar por cliente, nota o estancia…'" [search]="store.query().search" [activeCount]="store.activeFilterCount()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <label filters class="returns-date"><span class="rms-sr-only">Desde</span>
+        <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+      </label>
+      <label filters class="returns-date"><span class="rms-sr-only">Hasta</span>
+        <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+      </label>
+    </rms-filter-bar>
+
+    <rms-data-table [columns]="columns" [rows]="store.customerReturns()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()" errorTitle="No pudimos cargar las devoluciones"
+      caption="Devoluciones de clientes" [trackBy]="trackReturn" [rowClickable]="true" (rowClick)="open($event)" (retry)="store.load(store.query())"
+      emptyTitle="No hay devoluciones en esas fechas" emptyDescription="Cambia el rango de fechas, limpia los filtros o registra una devolución.">
+      <ng-template rmsCell="when" let-row>
+        <span class="returns-cell"><strong>{{ row.createdOnUtc | date:'d MMM y':'America/Managua' }}</strong><small>{{ row.createdOnUtc | date:'h:mm a':'America/Managua' }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="customer" let-row>
+        <span class="returns-cell returns-cell--wrap">
+          <span><strong>{{ customerOf(row) }}</strong></span>
+          <small>No. {{ row.customerReturnId }} @if (row.roomStayId) { · Estancia No. {{ row.roomStayId }} } · {{ row.lineCount }} línea(s)</small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="amount" let-row>
+        <span class="returns-cell returns-cell--num">
+          <strong>{{ row.currencyCode }} {{ row.totalRefund | number:'1.2-2' }}</strong>
+          @if (row.notes) { <small>{{ row.notes }}</small> }
+        </span>
+      </ng-template>
+      <ng-template rmsCell="cash" let-row>
+        <span class="returns-cell returns-cell--num">
+          <strong>@if (row.cashBoxSessionId !== null) { No. {{ row.cashBoxSessionId }} } @else { <span class="returns-nocash">Sin caja</span> }</strong>
+        </span>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+        label="devoluciones" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="'Devolución No. ' + (selected()?.customerReturnId ?? '')" eyebrow="Detalle de la devolución" (closed)="closeDetail()">
+  @if (selected(); as customerReturn) {
+    <div class="returns-detail">
+      <rms-status-badge tone="warning" [dot]="false">Reembolso pagado en efectivo · stock reingresado</rms-status-badge>
+      <dl class="returns-detail__list">
+        <div><dt>Cliente</dt><dd>{{ customerOf(customerReturn) }}</dd></div>
+        <div><dt>Estancia</dt><dd>@if (customerReturn.roomStayId) { No. {{ customerReturn.roomStayId }} } @else { — }</dd></div>
+        <div><dt>Reembolso total</dt><dd>{{ customerReturn.currencyCode }} {{ customerReturn.totalRefund | number:'1.2-2' }}</dd></div>
+        <div><dt>Sesión de caja</dt><dd>@if (customerReturn.cashBoxSessionId !== null) { No. {{ customerReturn.cashBoxSessionId }} } @else { No movió dinero en caja }</dd></div>
+        <div><dt>Notas</dt><dd>{{ customerReturn.notes || '—' }}</dd></div>
+        <div><dt>Cuándo</dt><dd>{{ customerReturn.createdOnUtc | date:'d MMM y, h:mm a':'America/Managua' }}</dd></div>
+      </dl>
+
+      <h4 class="returns-detail__subtitle">Productos devueltos</h4>
+      @if (selectedLoading()) {
+        <span class="rms-skeleton rms-skeleton--block" aria-busy="true"></span>
+      } @else if (selectedError(); as message) {
+        <rms-notice tone="danger" title="No pudimos cargar las líneas">{{ message }}</rms-notice>
+      } @else if (selectedItems(); as items) {
+        <ul class="returns-detail__items">
+          @for (item of items; track item.customerReturnItemId) {
+            <li>
+              <span><strong>{{ item.productName }}</strong><small>{{ item.productCode }} · {{ item.quantity | number:'1.0-2' }} {{ item.unitOfMeasure }} × {{ item.unitPrice | number:'1.2-2' }}</small></span>
+              <strong>{{ item.lineTotal | number:'1.2-2' }}</strong>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+</rms-drawer>

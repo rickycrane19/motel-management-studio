@@ -1,0 +1,106 @@
+// Controles nativos re-estilizados con la paleta (UI-V2-F01).
+// Todo va dentro de :where() (especificidad 0): el estilo de cada componente sigue mandando,
+// pero ningún control vuelve a pintarse con el blanco del sistema.
+
+$calendar-icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c25339' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M8 3v4M16 3v4M3 10h18'/%3E%3C/svg%3E";
+$chevron-icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c25339' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E";
+$clock-icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c25339' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E";
+
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='submit'], [type='button'], [type='reset'], [type='image'], [type='hidden']), textarea, select) {
+  border: 1px solid var(--cazo-line-strong);
+  border-radius: 10px;
+  color: var(--cazo-ink);
+  background-color: var(--cazo-surface);
+  accent-color: var(--cazo-brand);
+}
+:where(input, textarea)::placeholder { color: var(--cazo-muted); opacity: .85; }
+:where(input:not([type='checkbox'], [type='radio']), textarea, select):disabled { color: var(--cazo-muted); background-color: var(--cazo-surface-sunken); cursor: not-allowed; }
+:where(input[type='checkbox'], input[type='radio'], input[type='range'], progress) { accent-color: var(--cazo-brand); }
+
+// <select> totalmente estilizable (Chromium ≥ 135): el desplegable deja de ser la lista blanca del sistema.
+:where(select) { appearance: base-select; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+:where(select)::picker-icon { width: 16px; height: 16px; margin-inline-start: auto; background: url($chevron-icon) center / 16px no-repeat; content: ""; }
+:where(select)::picker(select) {
+  appearance: base-select;
+  max-height: min(360px, 60vh);
+  margin-block: 6px;
+  padding: 6px;
+  border: 1px solid var(--cazo-line-strong);
+  border-radius: 12px;
+  color: var(--cazo-ink);
+  background: var(--cazo-surface-raised);
+  box-shadow: var(--cazo-shadow-raised);
+  scrollbar-width: thin;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .14s var(--cazo-ease), transform .14s var(--cazo-ease), overlay .14s allow-discrete, display .14s allow-discrete;
+}
+:where(select):open::picker(select) { opacity: 1; transform: none; }
+@starting-style { :where(select):open::picker(select) { opacity: 0; transform: translateY(-4px); } }
+:where(select)::picker-icon { transition: rotate .16s var(--cazo-ease); }
+:where(select):open::picker-icon { rotate: 180deg; }
+:where(select) option {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--cazo-ink);
+  background: transparent;
+  font-size: 13px;
+}
+:where(select) option:hover, :where(select) option:focus-visible { outline: 0; background: var(--cazo-soft); }
+:where(select) option:checked { color: var(--cazo-brand-strong); background: var(--cazo-brand-soft); font-weight: 700; }
+:where(select) option::checkmark { color: var(--cazo-brand); }
+:where(select) option:disabled { color: var(--cazo-muted); opacity: .7; }
+// Listas múltiples/visibles (size>1): fondo crema y selección terracota.
+:where(select[multiple], select[size]:not([size='1'])) { padding: 6px; }
+:where(select[multiple], select[size]:not([size='1'])) option:checked { color: var(--cazo-on-dark); background: var(--cazo-brand) linear-gradient(0deg, var(--cazo-brand), var(--cazo-brand)); }
+
+// Fecha y hora: icono terracota en lugar del glifo gris del sistema.
+:where(input[type='date'], input[type='datetime-local'], input[type='month'], input[type='week'])::-webkit-calendar-picker-indicator,
+:where(input[type='time'])::-webkit-calendar-picker-indicator {
+  width: 18px;
+  height: 18px;
+  padding: 4px;
+  border-radius: 7px;
+  background: url($calendar-icon) center / 18px no-repeat;
+  color: transparent;
+  cursor: pointer;
+  opacity: 1;
+}
+:where(input[type='time'])::-webkit-calendar-picker-indicator { background-image: url($clock-icon); }
+:where(input[type='date'], input[type='datetime-local'], input[type='month'], input[type='week'], input[type='time'])::-webkit-calendar-picker-indicator:hover { background-color: var(--cazo-soft); }
+:where(input[type='date'], input[type='datetime-local'], input[type='month'], input[type='week'], input[type='time'])::-webkit-datetime-edit-fields-wrapper { padding: 0; }
+
+// Archivo: zona punteada crema y botón terracota (las vistas nuevas usan <rms-file-drop>).
+:where(input[type='file']) {
+  max-width: 100%;
+  padding: 6px;
+  border: 1px dashed var(--cazo-line-strong);
+  border-radius: 12px;
+  color: var(--cazo-muted);
+  background: var(--cazo-surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+:where(input[type='file'])::file-selector-button {
+  min-height: 36px;
+  margin-right: 12px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--cazo-on-dark);
+  background: var(--cazo-brand);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+:where(input[type='file'])::file-selector-button:hover { background: var(--cazo-brand-strong); }
+
+:where(details) > summary { cursor: pointer; }
+:where(details) > summary::marker { color: var(--cazo-brand); }
+:where(fieldset) { border-color: var(--cazo-line); }
+:where(hr) { border: 0; border-top: 1px solid var(--cazo-line); }
+:where(progress) { accent-color: var(--cazo-brand); }

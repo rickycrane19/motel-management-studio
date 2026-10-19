@@ -1,0 +1,131 @@
+<section class="rms-page cashier-stack">
+  <rms-page-header eyebrow="FINANZAS" title="Rendimiento por cajero"
+    subtitle="Ventas cobradas, turnos, propinas y comisiones a pagar por cada usuario o cajero en el período.">
+    <div meta>
+      <span class="cashier-range">Período aplicado: {{ store.appliedRangeLabel() }} · America/Managua · C$ NIO</span>
+    </div>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de reportes">Tu rol no puede consultar el rendimiento de cajeros. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión" data-print="hide">Puedes consultar lo que ya cargó. Para actualizar necesitas conexión.</rms-notice>
+    }
+
+    <rms-filter-bar [searchable]="false" [activeCount]="store.activeFilterCount()" (cleared)="clearFilters()">
+      <ng-container filters>
+        <div class="cashier-quick" role="group" aria-label="Rangos rápidos">
+          @for (range of quickRanges; track range.id) {
+            <button type="button" class="rms-btn rms-btn--sm cashier-quick__range" [attr.title]="range.hint"
+              [class.is-active]="isQuickActive(range)" (click)="applyQuickRange(range)">{{ range.label }}</button>
+          }
+        </div>
+        <label class="cashier-date"><span class="rms-sr-only">Desde</span>
+          <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+        </label>
+        <label class="cashier-date"><span class="rms-sr-only">Hasta</span>
+          <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+        </label>
+        <rms-combobox [options]="store.userOptions()" [formControl]="userControl" placeholder="Todos los usuarios"
+          emptyText="No hay usuarios con ese nombre" ariaLabel="Filtrar por usuario" />
+      </ng-container>
+      <ng-container actions>
+        <button type="button" class="rms-btn rms-btn--ghost" (click)="exportCsv()"
+          [disabled]="store.status() === 'loading' || !store.rows().length">
+          <rms-cazo-icon name="download" [size]="18" /> Exportar CSV
+        </button>
+        <button type="button" class="rms-btn rms-btn--secondary" (click)="print()"
+          [disabled]="store.status() === 'loading' || !canView()">
+          <rms-cazo-icon name="printer" [size]="18" /> Exportar PDF
+        </button>
+      </ng-container>
+    </rms-filter-bar>
+
+    <div #reportPrintArea id="reportPrintArea" class="cashier-print">
+      <div class="rms-stats" aria-label="Resumen del período">
+        <rms-stat-card label="Ventas cobradas" [value]="money(store.totals().salesCollected)"
+          hint="Estancias + minibar + multas" icon="cash" tone="brand" [loading]="store.status() === 'loading'" />
+        <rms-stat-card label="Sesiones / turnos" [value]="store.totals().sessionsCount"
+          [hint]="store.totals().openSessionsCount + ' abierto(s)'" icon="clock" tone="soft"
+          [loading]="store.status() === 'loading'" />
+        <rms-stat-card label="Propinas" [value]="money(store.totals().tipsInBase)"
+          [hint]="store.totals().tiesCount + ' registro(s)'" icon="coins" tone="success"
+          [loading]="store.status() === 'loading'" />
+        <rms-stat-card label="Comisiones a pagar" [value]="money(store.totals().commissionAmount)"
+          hint="Sobre ventas cobradas" icon="percent" tone="warning" [loading]="store.status() === 'loading'" />
+      </div>
+
+      <p class="cashier-note">Período leído: {{ store.startDate() }} al {{ store.endDate() }} (America/Managua · C$ NIO)</p>
+
+      @if (store.errorMessage()) {
+        <rms-notice tone="danger" title="No pudimos cargar el reporte">{{ store.errorMessage() }}</rms-notice>
+      }
+
+      <rms-data-table [columns]="columns" [rows]="store.rows()" [loading]="store.status() === 'loading'"
+        caption="Rendimiento por cajero del período" [trackBy]="trackRow" [rowClickable]="true" (rowClick)="open($event)"
+        emptyTitle="Sin movimiento de cajeros en ese rango" emptyDescription="Cambia el rango de fechas o limpia los filtros.">
+        <ng-template rmsCell="user" let-row>
+          <span class="cashier-cell"><strong>{{ row.userFullName }}</strong><small>{{ row.userName }} · #{{ row.userId }}</small></span>
+        </ng-template>
+        <ng-template rmsCell="role" let-row>
+          <rms-status-badge tone="brand" [dot]="false">{{ row.role || 'Sin perfil' }}</rms-status-badge>
+        </ng-template>
+        <ng-template rmsCell="sessions" let-row>
+          <span class="cashier-cell cashier-cell--num"><strong>{{ row.sessionsCount }}</strong>
+            <small>{{ row.openSessionsCount }} abierto(s)</small></span>
+        </ng-template>
+        <ng-template rmsCell="hours" let-row><span class="cashier-amount">{{ hours(row.hoursOnShift) }}</span></ng-template>
+        <ng-template rmsCell="stays" let-row><span class="cashier-amount">{{ row.staysCount }}</span></ng-template>
+        <ng-template rmsCell="sales" let-row><strong class="cashier-amount is-income">{{ money(row.salesCollected) }}</strong></ng-template>
+        <ng-template rmsCell="avgTicket" let-row><span class="cashier-amount">{{ money(row.avgTicket) }}</span></ng-template>
+        <ng-template rmsCell="tips" let-row>
+          <span class="cashier-cell cashier-cell--num"><strong [class.is-income]="row.tipsInBase > 0">{{ money(row.tipsInBase) }}</strong>
+            <small>{{ row.tiesCount }} propina(s)</small></span>
+        </ng-template>
+        <ng-template rmsCell="commission" let-row>
+          <span class="cashier-cell cashier-cell--num"><strong [class.is-income]="row.commissionAmount > 0">{{ money(row.commissionAmount) }}</strong>
+            <small>{{ percent(row.commissionRatePercent) }} · {{ row.commissionRuleName || 'tarifa heredada' }} · {{ metricLabel(row.commissionMetricType) }}</small></span>
+        </ng-template>
+        <ng-template rmsCell="difference" let-row>
+          <strong class="cashier-amount" [class.is-income]="row.differenceBase >= 0" [class.is-expense]="row.differenceBase < 0">{{ money(row.differenceBase) }}</strong>
+        </ng-template>
+      </rms-data-table>
+    </div>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.userFullName || 'Rendimiento'"
+  eyebrow="Detalle del cajero" (closed)="closeDetail()">
+  @if (selected(); as row) {
+    <div class="cashier-detail">
+      <div class="cashier-detail__head">
+        <small>Ventas cobradas</small>
+        <strong>{{ money(row.salesCollected) }}</strong>
+        <span>{{ row.userName }} · {{ row.role || 'Sin perfil' }} · #{{ row.userId }}</span>
+      </div>
+
+      <dl class="cashier-detail__list">
+        <div><dt>Turnos</dt><dd>{{ row.sessionsCount }} ({{ row.openSessionsCount }} abierto(s)) · {{ hours(row.hoursOnShift) }}</dd></div>
+        <div><dt>Estancias cerradas</dt><dd>{{ row.staysCount }}</dd></div>
+        <div><dt>Ticket promedio</dt><dd>{{ money(row.avgTicket) }}</dd></div>
+        <div><dt>Venta de estancias</dt><dd>{{ money(row.staysRevenue) }}</dd></div>
+        <div><dt>Venta de minibar</dt><dd>{{ money(row.productsRevenue) }}</dd></div>
+        <div><dt>Multas cobradas</dt><dd>{{ money(row.finesRevenue) }}</dd></div>
+        <div><dt>Ajustes de entrada</dt><dd>{{ money(row.adjustmentsInBase) }}</dd></div>
+        <div><dt>Ajustes de salida</dt><dd>{{ money(row.adjustmentsOutBase) }}</dd></div>
+        <div><dt>Propinas registradas</dt><dd>{{ money(row.tipsInBase) }} ({{ row.tiesCount }} registro(s))</dd></div>
+        <div><dt>Comisión</dt><dd>{{ percent(row.commissionRatePercent) }} = {{ money(row.commissionAmount) }}
+          @if (row.commissionRuleName) { · {{ row.commissionRuleName }} ({{ metricLabel(row.commissionMetricType) }}) } @else { · tarifa heredada }</dd></div>
+        <div><dt>Diferencia de caja</dt>
+          <dd [class.is-income]="row.differenceBase >= 0" [class.is-expense]="row.differenceBase < 0">{{ money(row.differenceBase) }}</dd></div>
+      </dl>
+
+      <p class="rms-muted cashier-detail__note">
+        La comisión sale de la regla más específica (empleado, luego puesto, luego general) según su tramo y vigencia; si no hay
+        regla, se usa la tarifa heredada de la ficha del empleado. Las propinas suman los ajustes de caja clasificados como
+        Propina. La diferencia de caja se lee del cierre o conteo de la sesión.
+      </p>
+    </div>
+  }
+</rms-drawer>

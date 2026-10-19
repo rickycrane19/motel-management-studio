@@ -1,0 +1,220 @@
+<section class="rms-page history-stack">
+  <rms-page-header eyebrow="FINANZAS / CAJA" title="Historial de caja"
+    subtitle="Turnos abiertos y cerrados de tu sucursal con su reconciliación: fondo inicial, ventas, ajustes y resultado del arqueo.">
+    <ng-container actions>
+      <button class="rms-btn rms-btn--secondary" type="button" (click)="load()" [disabled]="loading()">
+        <rms-cazo-icon name="refresh" [size]="18" /> Actualizar
+      </button>
+    </ng-container>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de caja">
+      Tu usuario necesita finance:view-cashbox para consultar el historial de esta sucursal.
+    </rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión" data-print="hide">Puedes revisar lo ya cargado. Para consultar o exportar necesitas conexión.</rms-notice>
+    }
+
+    <div id="reportPrintArea" class="history-print">
+      <div class="rms-stats" aria-label="Resumen del historial">
+        <rms-stat-card label="Turnos en el rango" [value]="totalRecords()" hint="Sesiones que abrieron en el rango"
+          icon="receipt" tone="soft" [loading]="loading() && !rows().length" />
+        <rms-stat-card label="Ventas cobradas" [value]="money(stats().sales)" hint="Solo lo listado en esta página"
+          icon="trend-up" tone="brand" [loading]="loading() && !rows().length" />
+        <rms-stat-card label="Diferencia neta" [value]="signedMoney(stats().difference)" hint="Contado menos calculado de lo listado"
+          icon="swap" [tone]="stats().difference < 0 ? 'danger' : stats().difference > 0 ? 'warning' : 'success'"
+          [loading]="loading() && !rows().length" />
+        <rms-stat-card label="Faltantes / Sobrantes" [value]="stats().faltantes + ' / ' + stats().sobrantes"
+          hint="Turnos con faltante / sobrante" icon="alert" tone="warning" [loading]="loading() && !rows().length" />
+      </div>
+
+      @if (!stats().complete && totalRecords() > 0) {
+        <rms-notice tone="info" title="Rango con muchos turnos">
+          Hay {{ totalRecords() }} turnos en el rango y se muestran {{ rows().length }}. Los indicadores de arriba corresponden a lo listado.
+        </rms-notice>
+      }
+
+      <rms-filter-bar [searchable]="false" [activeCount]="activeFilterCount()" (cleared)="clearFilters()">
+        <ng-container filters>
+          <div class="history-quick" role="group" aria-label="Rangos rápidos">
+            @for (range of quickRanges; track range.id) {
+              <button type="button" class="rms-btn rms-btn--sm history-quick__range"
+                [class.is-active]="isQuickActive(range)" (click)="applyQuickRange(range)">{{ range.label }}</button>
+            }
+          </div>
+          <label class="history-date"><span class="rms-sr-only">Desde</span>
+            <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+          </label>
+          <label class="history-date"><span class="rms-sr-only">Hasta</span>
+            <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+          </label>
+          <rms-combobox [options]="cashBoxOptions()" [formControl]="cashBoxControl" placeholder="Todas las cajas"
+            emptyText="No hay cajas con ese nombre" ariaLabel="Filtrar por caja" />
+        </ng-container>
+        <ng-container actions>
+          <button type="button" class="rms-btn rms-btn--secondary" (click)="exportCsv()"
+            [disabled]="!rows().length || !network.online()">
+            <rms-cazo-icon name="download" [size]="18" /> Exportar CSV
+          </button>
+          <button type="button" class="rms-btn rms-btn--secondary" (click)="print()"
+            [disabled]="!rows().length || loading()">
+            <rms-cazo-icon name="printer" [size]="18" /> Exportar PDF
+          </button>
+        </ng-container>
+      </rms-filter-bar>
+
+      @if (error() && rows().length) {
+        <rms-notice tone="warning" title="No pudimos actualizar el historial" [dismissible]="true" (dismissed)="error.set(null)">
+          {{ error() }}
+        </rms-notice>
+      }
+
+      <rms-data-table [columns]="columns" [rows]="rows()" [loading]="loading()" [error]="error()"
+        errorTitle="No pudimos cargar el historial" caption="Historial de turnos de caja" [trackBy]="trackSession"
+        [rowClickable]="true" (rowClick)="open($event)" (retry)="retry()"
+        emptyTitle="No hay turnos en esas fechas" emptyDescription="Cambia el rango, elige otra caja o limpia los filtros.">
+        <ng-template rmsCell="shift" let-row>
+          <span class="history-cell">
+            <strong>{{ row.shiftName || 'Turno general' }}</strong>
+            <small>{{ row.userName || 'Operador' }}</small>
+            <rms-status-badge [tone]="statusTone(row)" [dot]="false">{{ row.statusName }}</rms-status-badge>
+          </span>
+        </ng-template>
+        <ng-template rmsCell="cashBox" let-row>
+          <span class="history-cell">
+            <strong>{{ row.cashBoxName }}</strong>
+            <small>#{{ row.cashBoxSessionId }}</small>
+          </span>
+        </ng-template>
+        <ng-template rmsCell="opened" let-row>
+          <span class="history-cell"><strong>{{ formatManagua(row.openedAtManagua) }}</strong></span>
+        </ng-template>
+        <ng-template rmsCell="closed" let-row>
+          <span class="history-cell">
+            <strong>{{ formatManagua(row.closedAtManagua) }}</strong>
+            @if (!row.closedAtUtc) { <small>Turno en curso</small> }
+          </span>
+        </ng-template>
+        <ng-template rmsCell="opening" let-row>
+          <span class="history-cell history-cell--num"><strong>{{ money(row.openingBalanceBase) }}</strong></span>
+        </ng-template>
+        <ng-template rmsCell="sales" let-row>
+          <span class="history-cell history-cell--num"><strong>{{ money(row.totalSalesBase) }}</strong></span>
+        </ng-template>
+        <ng-template rmsCell="adjustments" let-row>
+          <span class="history-cell history-cell--num">
+            <strong>{{ money(row.totalInAdjustmentsBase) }}</strong>
+            <small>− {{ money(row.totalOutAdjustmentsBase) }} · {{ row.outAdjustmentsCount }} salida(s)</small>
+          </span>
+        </ng-template>
+        <ng-template rmsCell="closing" let-row>
+          <span class="history-cell history-cell--num">
+            <strong>{{ money(row.closingCalculatedBase) }}</strong>
+            <small>Contado {{ money(row.closingActualBase) }}</small>
+          </span>
+        </ng-template>
+        <ng-template rmsCell="difference" let-row>
+          <span class="history-cell history-cell--num">
+            <strong [class.is-negative]="row.differenceBase < 0" [class.is-positive]="row.differenceBase > 0">{{ signedMoney(row.differenceBase) }}</strong>
+            <rms-status-badge [tone]="differenceTone(row)" [dot]="false">{{ differenceLabel(row) }}</rms-status-badge>
+          </span>
+        </ng-template>
+        <rms-pager [page]="page()" [pageSize]="pageSize()" [total]="totalRecords()" [loading]="loading()"
+          label="turnos" [pageSizeOptions]="pageSizes" (pageChange)="goToPage($event)" (pageSizeChange)="setPageSize($event)" />
+      </rms-data-table>
+    </div>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected() ? 'Turno #' + selected()!.cashBoxSessionId : 'Turno'"
+  [subtitle]="selected()?.cashBoxName ?? null" eyebrow="Detalle del turno" (closed)="closeDetail()">
+  @if (detailLoading()) {
+    <p class="history-drawer__state" role="status">Consultando el resumen del turno…</p>
+  } @else if (detailError(); as message) {
+    <rms-notice tone="warning" title="No pudimos cargar el detalle">{{ message }}</rms-notice>
+  } @else if (selected(); as row) {
+    <div class="history-detail">
+      <div class="history-detail__recon">
+        <article><small>Saldo inicial</small><strong>{{ money(row.openingBalanceBase) }}</strong></article>
+        <article><small>Ventas</small><strong>{{ money(row.totalSalesBase) }}</strong></article>
+        <article><small>Entradas</small><strong>+ {{ money(row.totalInAdjustmentsBase) }}</strong></article>
+        <article><small>Salidas</small><strong>− {{ money(row.totalOutAdjustmentsBase) }}</strong></article>
+        <article><small>Calculado</small><strong>{{ money(row.closingCalculatedBase) }}</strong></article>
+        <article><small>Contado</small><strong>{{ money(row.closingActualBase) }}</strong></article>
+      </div>
+
+      <div class="history-detail__result">
+        <span>Resultado del arqueo</span>
+        <strong [class.is-negative]="row.differenceBase < 0" [class.is-positive]="row.differenceBase > 0">{{ signedMoney(row.differenceBase) }}</strong>
+        <rms-status-badge [tone]="differenceTone(row)">{{ differenceLabel(row) }}</rms-status-badge>
+      </div>
+
+      <dl class="history-detail__facts">
+        <div><dt>Caja</dt><dd>{{ row.cashBoxName }}</dd></div>
+        <div><dt>Turno</dt><dd>{{ row.shiftName || 'Turno general' }}</dd></div>
+        <div><dt>Operador</dt><dd>{{ row.userName || 'Operador' }}</dd></div>
+        <div><dt>Estado</dt><dd>{{ row.statusName }}</dd></div>
+        <div><dt>Apertura</dt><dd>{{ formatManagua(row.openedAtManagua) }}</dd></div>
+        <div><dt>Cierre</dt><dd>{{ formatManagua(row.closedAtManagua) }}</dd></div>
+        <div><dt>Ajustes de salida</dt><dd>{{ row.outAdjustmentsCount }}</dd></div>
+        <div><dt>Conteos registrados</dt><dd>{{ row.countsCount }}</dd></div>
+        @if (row.notes) { <div><dt>Observaciones</dt><dd>{{ row.notes }}</dd></div> }
+      </dl>
+
+      <h3>Conteos por denominación</h3>
+      @if (detailCounts().length) {
+        <div class="history-counts">
+          @for (group of detailCounts(); track group.countTypeId) {
+            <section class="history-count-group">
+              <header>
+                <strong>{{ group.countType }}</strong>
+                <span>{{ group.recordedAt ? formatManagua(group.recordedAt) : 'Hora no disponible' }}</span>
+              </header>
+              <div class="history-count-table">
+                <div class="history-count-table__head"><span>Moneda</span><span>Denominación</span><span>Piezas</span><span>Subtotal</span></div>
+                @for (line of group.counts; track line.currencyCode + line.denominationLabel) {
+                  <div class="history-count-table__row">
+                    <span>{{ line.currencyCode }}</span>
+                    <strong>{{ line.denominationLabel }}</strong>
+                    <span>{{ line.count }}</span>
+                    <strong>{{ money(line.subtotal) }}</strong>
+                  </div>
+                }
+              </div>
+              <footer class="history-count-group__totals">
+                @for (total of countCurrencyTotals(group); track total.currencyCode) {
+                  <span><small>{{ total.currencyCode }}</small><strong>{{ money(total.amount) }}</strong></span>
+                }
+              </footer>
+            </section>
+          }
+        </div>
+      } @else {
+        <p class="rms-muted">Este turno no tiene conteos registrados.</p>
+      }
+
+      <h3>Ajustes de efectivo</h3>
+      @if (detailAdjustments().length) {
+        <div class="history-adjustments">
+          @for (adjustment of detailAdjustments(); track adjustment.adjustmentId) {
+            <article class="history-adjustment">
+              <div>
+                <strong>{{ adjustment.adjustmentTypeName }} · {{ adjustment.currencyCode }}</strong>
+                <small>{{ adjustment.reason || 'Sin motivo registrado' }} · {{ formatManagua(adjustment.recordedAtManagua) }}</small>
+              </div>
+              <b [class.is-out]="adjustment.adjustmentType === 'OUT'">{{ adjustment.adjustmentType === 'OUT' ? '−' : '+' }}{{ money(adjustment.amount) }}</b>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="rms-muted">Este turno no tiene ajustes de efectivo.</p>
+      }
+    </div>
+  }
+
+  <div footer class="history-drawer__footer">
+    <button type="button" class="rms-btn rms-btn--secondary" (click)="closeDetail()">Cerrar</button>
+  </div>
+</rms-drawer>

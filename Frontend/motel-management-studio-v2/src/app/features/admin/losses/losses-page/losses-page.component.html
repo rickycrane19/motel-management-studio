@@ -1,0 +1,125 @@
+<section class="rms-page losses-stack">
+  <rms-page-header eyebrow="FINANZAS" title="Pérdidas del negocio"
+    subtitle="Daños, faltantes y mermas registrados por categoría. Cada pérdida es un registro inmutable: se consulta y se registra, nunca se edita ni se borra.">
+    <ng-container actions>
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="print()"
+        [disabled]="store.status() === 'loading' || !store.items().length">
+        <rms-cazo-icon name="printer" [size]="18" /> Exportar PDF
+      </button>
+      <a class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!canRegister() || !network.online()">
+        <rms-cazo-icon name="plus" [size]="18" /> Registrar pérdida
+      </a>
+    </ng-container>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de finanzas">Tu rol no puede consultar las pérdidas registradas. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión" data-print="hide">Puedes consultar lo que ya cargó. Para registrar una pérdida necesitas conexión.</rms-notice>
+    }
+
+    <div id="reportPrintArea" class="losses-print">
+      <div class="rms-stats" aria-label="Resumen de pérdidas">
+        <rms-stat-card label="Pérdidas listadas" [value]="store.stats().count" hint="En el rango elegido" icon="alert" tone="warning" [loading]="store.status() === 'loading' && !store.items().length" />
+        <rms-stat-card label="Monto total" [value]="money(store.stats().total)" hint="En C$ (moneda base)" icon="trend-down" tone="danger" [loading]="store.status() === 'loading' && !store.items().length" />
+        <rms-stat-card label="Categorías con pérdidas" [value]="store.stats().byCategory.length" hint="De Habitación, Minibar, Caja u Otro" icon="layers" tone="soft" [loading]="store.status() === 'loading' && !store.items().length" />
+      </div>
+
+      @if (!store.stats().complete && store.totalRecords() > 0) {
+        <rms-notice tone="info" title="Rango con muchas pérdidas">
+          Hay {{ store.totalRecords() }} pérdidas en el rango y se muestran las {{ store.stats().count }} más recientes. Los totales de arriba corresponden a lo listado.
+        </rms-notice>
+      }
+
+      <rms-filter-bar [searchable]="false" [activeCount]="store.activeFilterCount()" (cleared)="clearFilters()">
+        <ng-container filters>
+          <div class="losses-quick" role="group" aria-label="Rangos rápidos">
+            @for (range of quickRanges; track range.id) {
+              <button type="button" class="rms-btn rms-btn--sm losses-quick__range"
+                [class.is-active]="isQuickActive(range)" (click)="applyQuickRange(range)">{{ range.label }}</button>
+            }
+          </div>
+          <label class="losses-date"><span class="rms-sr-only">Desde</span>
+            <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+          </label>
+          <label class="losses-date"><span class="rms-sr-only">Hasta</span>
+            <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+          </label>
+          <rms-combobox [options]="categoryOptions" [formControl]="categoryControl" placeholder="Todas las categorías"
+            emptyText="No hay categorías con ese nombre" ariaLabel="Filtrar por categoría" />
+        </ng-container>
+      </rms-filter-bar>
+
+      @if (store.stats().byCategory.length) {
+        <rms-panel title="Pérdidas por categoría" subtitle="Mismo rango y filtros que el listado.">
+          <ul class="losses-breakdown">
+            @for (entry of store.stats().byCategory; track entry.code) {
+              <li>
+                <span class="losses-breakdown__name"><rms-status-badge tone="warning" [dot]="false">{{ entry.label }}</rms-status-badge></span>
+                <span class="losses-breakdown__count">{{ entry.count }} registro(s)</span>
+                <strong class="losses-breakdown__amount">{{ money(entry.amount) }}</strong>
+              </li>
+            }
+          </ul>
+        </rms-panel>
+      }
+
+      <rms-data-table [columns]="columns" [rows]="store.items()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()"
+        errorTitle="No pudimos cargar las pérdidas" caption="Pérdidas registradas del período" [trackBy]="trackLoss"
+        [rowClickable]="true" (rowClick)="open($event)" (retry)="store.load()"
+        emptyTitle="No hay pérdidas en esas fechas" emptyDescription="Cambia el rango, limpia los filtros o registra una pérdida.">
+        <ng-template rmsCell="when" let-row>
+          <span class="losses-cell"><strong>{{ when(row.recordedAtManagua) }}</strong><small>#{{ row.lossId }}</small></span>
+        </ng-template>
+        <ng-template rmsCell="category" let-row>
+          <span class="losses-cell"><rms-status-badge tone="warning" [dot]="false">{{ categoryLabel(row.categoryCode) }}</rms-status-badge></span>
+        </ng-template>
+        <ng-template rmsCell="description" let-row>
+          <span class="losses-cell losses-cell--wrap"><strong>{{ row.description }}</strong>
+            <small>{{ row.createdByName ? 'Registró: ' + row.createdByName : 'Sin usuario registrado' }}</small></span>
+        </ng-template>
+        <ng-template rmsCell="room" let-row>
+          <span class="losses-cell"><strong>{{ row.roomNumber ? 'Cuarto ' + row.roomNumber : '—' }}</strong>
+            <small>{{ row.roomStayId ? 'Estancia #' + row.roomStayId : 'Sin estancia' }}</small></span>
+        </ng-template>
+        <ng-template rmsCell="amount" let-row>
+          <span class="losses-cell losses-cell--num"><strong class="is-loss">− {{ money(row.amountInBase) }}</strong>
+            <small>{{ row.currencyCode }} · tasa {{ row.exchangeRate | number:'1.2-4' }}</small></span>
+        </ng-template>
+        <ng-template rmsCell="cash" let-row>
+          @if (row.cashBoxSessionId) {
+            <rms-status-badge tone="success" [dot]="false">Descontada del turno</rms-status-badge>
+          } @else {
+            <rms-status-badge tone="neutral" [dot]="false">Solo en reportes</rms-status-badge>
+          }
+        </ng-template>
+        <rms-pager [page]="store.query().page" [pageSize]="store.query().pageSize" [total]="store.totalRecords()"
+          [loading]="store.status() === 'loading'" label="pérdidas" [pageSizeOptions]="pageSizes"
+          (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event })" />
+      </rms-data-table>
+    </div>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected() ? categoryLabel(selected()!.categoryCode) : 'Pérdida'" eyebrow="Detalle de la pérdida" (closed)="closeDetail()">
+  @if (selected(); as loss) {
+    <div class="losses-detail">
+      <div class="losses-detail__amount">
+        <small>Monto de la pérdida</small>
+        <strong>{{ money(loss.amountInBase) }}</strong>
+        <span>{{ loss.currencyCode }} · tasa {{ loss.exchangeRate | number:'1.2-4' }}</span>
+      </div>
+      <dl class="losses-detail__list">
+        <div><dt>Qué pasó</dt><dd>{{ loss.description }}</dd></div>
+        <div><dt>Cuándo</dt><dd>{{ when(loss.recordedAtManagua) }}</dd></div>
+        <div><dt>Cuarto</dt><dd>{{ loss.roomNumber ? 'Cuarto ' + loss.roomNumber : 'No aplica' }}</dd></div>
+        <div><dt>Estancia</dt><dd>{{ loss.roomStayId ? 'No. ' + loss.roomStayId : 'No aplica' }}</dd></div>
+        <div><dt>Efectivo del turno</dt>
+          <dd>{{ loss.cashBoxSessionId ? 'Se descontó de la caja del turno (sesión #' + loss.cashBoxSessionId + ')' : 'No se descontó: quedó solo en reportes' }}</dd></div>
+        <div><dt>Registrado por</dt><dd>{{ loss.createdByName || 'Sin usuario registrado' }}</dd></div>
+      </dl>
+      <p class="rms-muted losses-detail__note">Las pérdidas no se editan ni se borran: si hubo un error, registra una pérdida o un ajuste que lo compense.</p>
+    </div>
+  }
+</rms-drawer>

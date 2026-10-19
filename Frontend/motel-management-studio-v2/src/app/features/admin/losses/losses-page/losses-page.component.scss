@@ -1,0 +1,66 @@
+:host { display: block; }
+.losses-stack { display: grid; gap: 18px; }
+
+// Rangos rápidos + fechas (America/Managua) dentro de la barra de filtros.
+.losses-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.losses-quick__range {
+  border: 1px solid var(--cazo-line-strong);
+  background: var(--cazo-surface);
+  color: var(--cazo-ink);
+  &:hover { border-color: var(--cazo-brand); color: var(--cazo-brand-strong); background: var(--cazo-soft); }
+  &.is-active { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); color: var(--cazo-brand-strong); }
+}
+.losses-date { display: block; min-width: 168px; }
+
+// Contenedor imprimible: conserva el ritmo vertical de la página al agrupar indicadores, desglose y listado.
+.losses-print { display: grid; gap: 18px; }
+
+// Desglose por categoría.
+.losses-breakdown {
+  display: grid; gap: 10px; margin: 0; padding: 0; list-style: none;
+  li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--cazo-line); border-radius: var(--cazo-radius-md); background: var(--cazo-surface); }
+  &__name { min-width: 130px; }
+  &__count { color: var(--cazo-muted); font-size: 13px; }
+  &__amount { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--cazo-danger); }
+}
+
+// Celdas de la tabla.
+.losses-cell {
+  display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &--wrap { strong, small { overflow: visible; text-overflow: clip; white-space: normal; } }
+  &--num { text-align: right; strong { font-variant-numeric: tabular-nums; } strong.is-loss { color: var(--cazo-danger); } }
+}
+
+// Detalle del panel lateral.
+.losses-detail {
+  display: grid; gap: 16px;
+  &__amount {
+    display: grid; gap: 2px; padding: 14px 16px; border-radius: var(--cazo-radius-md); background: var(--cazo-danger-soft);
+    small { color: var(--cazo-muted); font-size: 12px; font-weight: 600; }
+    strong { font: 650 26px/1.05 var(--cazo-font-display); color: var(--cazo-danger); font-variant-numeric: tabular-nums; }
+    span { color: var(--cazo-muted); font-size: 12px; }
+  }
+  &__list { display: grid; gap: 12px; margin: 0;
+    div { display: grid; gap: 3px; }
+    dt { color: var(--cazo-muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+    dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+  }
+  &__note { margin: 0; font-size: 12px; line-height: 1.5; }
+}
+
+@media (max-width: 760px) {
+  .losses-quick { width: 100%; }
+  .losses-date { flex: 1 1 150px; min-width: 0; }
+}
+
+// Deja que las celdas envuelvan en papel: en pantalla recortan con puntos suspensivos.
+@media print {
+  .losses-cell strong,
+  .losses-cell small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}

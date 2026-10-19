@@ -1,0 +1,341 @@
+/* ============================================================================
+ * El Rapidin · Estilos de impresión de reportes (PrintReportService)
+ *
+ * ES GLOBAL: impórtalo UNA vez en `src/styles.scss`, junto a los demás parciales:
+ *
+ *     @use './app/shared/print/print-report';
+ *
+ * Define la apariencia del documento que `PrintReportService` monta fuera de
+ * `app-root` (`.rms-print-root`, hijo de `document.body`) y las reglas de papel
+ * y de tablas largas. La visibilidad del contenedor la controla el servicio con
+ * estilos en línea (`display:none` en pantalla → `display:block` al imprimir);
+ * aquí solo se define cómo se ve y cómo se parte en páginas.
+ *
+ * Nota: los números de página no se imprimen porque Chrome no soporta
+ * `@page { @bottom-center { content: counter(page) } }`. El pie se repite en
+ * cada hoja con `position: fixed`.
+ * ========================================================================== */
+
+/* ── Papel: A4 vertical con márgenes de documento (12 mm) ──────────────────── */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+.rms-print-root {
+  color: #0f172a;
+  background: #fff;
+  font-family: var(--cazo-font-body);
+  font-size: 10pt;
+  line-height: 1.4;
+
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    color: #0f172a;
+    font-family: var(--cazo-font-display);
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  rms-cazo-icon svg {
+    stroke-width: 1.6;
+  }
+}
+
+/* ── Encabezado del documento ─────────────────────────────────────────────── */
+.rms-print-head {
+  display: grid;
+  gap: 6pt;
+  margin-bottom: 10pt;
+  padding-bottom: 8pt;
+  border-bottom: 1pt solid #0f172a;
+}
+
+.rms-print-head__brand {
+  display: grid;
+  gap: 2pt;
+}
+
+.rms-print-head__biz {
+  color: #0369a1;
+  font-size: 8.5pt;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.rms-print-head__title {
+  margin: 0;
+  font-size: 17pt;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.rms-print-head__subtitle {
+  color: #334155;
+  font-size: 9.5pt;
+  line-height: 1.35;
+}
+
+.rms-print-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3pt 18pt;
+  margin: 2pt 0 0;
+}
+
+.rms-print-head__meta-row {
+  display: grid;
+  gap: 1pt;
+}
+
+.rms-print-head__meta-row dt {
+  color: #64748b;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.rms-print-head__meta-row dd {
+  margin: 0;
+  font-size: 9.5pt;
+  font-weight: 650;
+}
+
+.rms-print-head__generated {
+  color: #64748b;
+  font-size: 8pt;
+}
+
+/* ── Cuerpo del documento ─────────────────────────────────────────────────── */
+.rms-print-body {
+  display: grid;
+  gap: 10pt;
+  padding-bottom: 12mm; /* deja aire al pie fijo de cada página */
+}
+
+/* ── Pie de página: se repite en cada hoja ────────────────────────────────── */
+.rms-print-foot {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8pt;
+  padding-top: 4pt;
+  border-top: 0.5pt solid #94a3b8;
+  color: #64748b;
+  font-size: 7.5pt;
+}
+
+/* ── Tablas largas: encabezado repetido y filas sin cortar ────────────────── */
+.rms-print-root table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+
+.rms-print-root thead {
+  display: table-header-group;
+}
+
+.rms-print-root tfoot {
+  display: table-footer-group;
+}
+
+.rms-print-root tr,
+.rms-print-root td,
+.rms-print-root th {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.rms-print-root th {
+  padding: 5pt 5pt;
+  border: 0.5pt solid #94a3b8;
+  color: #0f172a;
+  background: #eef4fb !important;
+  font-size: 8pt;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.rms-print-root td {
+  height: auto !important;
+  padding: 4.5pt 5pt;
+  border: 0.5pt solid #cbd5e1;
+  color: #0f172a;
+  vertical-align: top;
+}
+
+/* La alineación por columna del design system se conserva en papel. */
+.rms-print-root th.is-end,
+.rms-print-root td.is-end {
+  text-align: right;
+}
+
+.rms-print-root th.is-center,
+.rms-print-root td.is-center {
+  text-align: center;
+}
+
+.rms-print-root tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+/* La tabla del design system pierde su marco de app: en papel son bordes finos. */
+.rms-print-root .rms-table,
+.rms-print-root rms-data-table {
+  overflow: visible !important;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+.rms-print-root .rms-table__scroll {
+  overflow: visible !important;
+}
+
+.rms-print-root .rms-table td small,
+.rms-print-root .rms-table td strong {
+  display: block;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+/* ── Indicadores: rejilla fija de 3 columnas, sin sombras ni fondos ───────── */
+.rms-print-root .rms-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40mm, 1fr));
+  gap: 6pt;
+}
+
+.rms-print-root .rms-stat {
+  min-height: 0;
+  padding: 7pt 9pt;
+  border: 0.5pt solid #94a3b8;
+  border-radius: 4pt;
+  background: #fff;
+}
+
+.rms-print-root .rms-stat__icon {
+  width: 20pt;
+  height: 20pt;
+  flex: 0 0 20pt;
+  border: 0.5pt solid #cbd5e1;
+  border-radius: 4pt;
+  color: #0369a1 !important;
+  background: #fff !important;
+}
+
+.rms-print-root .rms-stat__body strong {
+  overflow: visible !important;
+  font-size: 13pt;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.rms-print-root .rms-stat__body em,
+.rms-print-root .rms-stat__body small {
+  overflow: visible !important;
+  color: #475569 !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+/* ── Paneles y desgloses ──────────────────────────────────────────────────── */
+.rms-print-root .rms-panel,
+.rms-print-root rms-panel {
+  overflow: visible !important;
+  border: 0.5pt solid #94a3b8;
+  border-radius: 4pt;
+  background: #fff;
+}
+
+.rms-print-root .rms-panel__header {
+  padding: 7pt 9pt 5pt;
+  border-bottom: 0.5pt solid #cbd5e1;
+}
+
+.rms-print-root .rms-panel__header h2 {
+  font-size: 11pt;
+}
+
+.rms-print-root .rms-panel__header p,
+.rms-print-root .rms-panel__body {
+  font-size: 9pt;
+}
+
+.rms-print-root .rms-panel__body {
+  padding: 7pt 9pt;
+}
+
+/* ── Insignias de estado: fondo blanco, color solo en el texto ────────────── */
+.rms-print-root .rms-badge {
+  padding: 1pt 4pt !important;
+  border: 0.5pt solid #cbd5e1 !important;
+  border-radius: 3pt;
+  background: #fff !important;
+  color: #0f172a !important;
+  font-size: 7.5pt;
+}
+
+.rms-print-root .rms-badge i {
+  background: #64748b !important;
+}
+
+/* ── Nada de andamios de carga ni chrome de pantalla ─────────────────────── */
+.rms-print-root .rms-skeleton,
+.rms-print-root .rms-sr-only,
+.rms-print-root .rms-page-header,
+.rms-print-root .rms-page-header__actions {
+  display: none !important;
+}
+
+/* ── Al imprimir: la app se oculta y solo queda el documento ──────────────── */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body.rms-printing app-root {
+    display: none !important;
+  }
+
+  body.rms-printing .layout,
+  body.rms-printing .layout__content {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .rms-print-root {
+    display: block;
+    max-width: none;
+    margin: 0;
+  }
+}

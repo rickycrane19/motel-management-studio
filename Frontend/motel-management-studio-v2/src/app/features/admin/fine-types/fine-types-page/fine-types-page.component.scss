@@ -1,0 +1,8 @@
+:host { display: block; }
+.fine-types-page { display: grid; gap: 16px; }
+.rms-btn.is-disabled { pointer-events: none; opacity: .55; }
+.filter-status { min-width: 200px; }
+.cell-sub { display: block; max-width: 100%; overflow: hidden; color: var(--cazo-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.cell-main { display: block; font-size: 14px; }
+.cell-price { display: block; font-variant-numeric: tabular-nums; font-size: 14px; }
+.row-actions { display: inline-flex; align-items: center; gap: 6px; }

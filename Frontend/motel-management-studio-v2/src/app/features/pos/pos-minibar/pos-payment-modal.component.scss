@@ -1,0 +1,133 @@
+/* Port literal del modal de cobro del restaurante v2 (checkout de estancia).
+   .method-state / .method-spinner ya viven en src/styles/_pos-payment-modal.scss:
+   no se duplican aquí. */
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(15 23 42 / 68%);
+  backdrop-filter: blur(5px);
+}
+
+.payment-modal {
+  width: min(700px, 100%);
+  max-height: min(820px, calc(100dvh - 32px));
+  display: grid;
+  gap: 14px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(2 132 199 / 55%) transparent;
+  padding: 22px;
+  border: 1px solid rgb(194 83 57 / 34%);
+  border-radius: 28px;
+  color: var(--cazo-ink);
+  background: var(--cazo-bg);
+  box-shadow: 0 30px 70px rgb(15 23 42 / 35%);
+  transform: translateZ(0);
+}
+.payment-modal::-webkit-scrollbar { width: 8px; }
+.payment-modal::-webkit-scrollbar-thumb { border-radius: 999px; background: rgb(2 132 199 / 55%); }
+
+.payment-modal > header { display: grid; grid-template-columns: 44px minmax(0, 1fr) 42px; align-items: center; gap: 12px; }
+.payment-modal h2, .payment-modal h3, .payment-modal p { margin: 0; }
+.payment-modal h2 { font: 650 22px/1.1 'Outfit Variable', Outfit, sans-serif; }
+.payment-modal header small { display: block; margin-top: 4px; color: var(--cazo-muted); font-size: 10px; }
+.header-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; color: var(--cazo-bg); background: var(--cazo-brand); }
+.close { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgb(194 83 57 / 25%); border-radius: 12px; color: var(--cazo-ink); background: transparent; cursor: pointer; }
+
+.amount-card { min-height: 104px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 20px; border-radius: 16px; color: #fff8ef; background: var(--cazo-ink); }
+.amount-card > span { display: grid; gap: 7px; }
+.amount-card > span:last-child { justify-items: end; }
+.amount-card small { font-size: 9px; }
+.amount-card > span:first-child strong { font: 500 32px/1 'Outfit Variable', Outfit, sans-serif; }
+.amount-card > span:last-child strong { font: 650 18px/1 'Outfit Variable', Outfit, sans-serif; }
+.amount-card em { color: rgb(255 248 239 / 72%); font-size: 8px; font-style: normal; }
+
+.payment-details { display: grid; gap: 13px; padding: 16px; border: 1px solid rgb(194 83 57 / 24%); border-radius: 20px; background: var(--cazo-soft); box-shadow: 0 10px 24px rgb(15 23 42 / 5%); }
+.payment-details__heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 1px 1px 13px; border-bottom: 1px solid rgb(194 83 57 / 16%); }
+.payment-details__title { min-width: 0; display: grid; gap: 5px; }
+.payment-details__title-row { display: flex; align-items: center; gap: 9px; }
+.payment-details__title-row h3 { margin: 0; font: 680 18px/1.05 'Outfit Variable', Outfit, sans-serif; letter-spacing: -.02em; }
+.payment-details__title small { max-width: 47ch; color: var(--cazo-muted); font-size: 9px; line-height: 1.35; }
+.payment-details__count { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; color: var(--cazo-brand); background: rgb(194 83 57 / 11%); font-size: 8px; font-weight: 800; white-space: nowrap; }
+.payment-details__base { flex: 0 0 auto; max-width: 26ch; color: var(--cazo-muted); font-size: 9px; line-height: 1.35; text-align: right; }
+
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.section-heading strong { font: 650 14px 'Outfit Variable', Outfit, sans-serif; }
+.section-heading small { color: var(--cazo-muted); font-size: 8px; }
+
+/* Botones de método (Efectivo / Tarjeta / Mixto), copia literal del method-grid. */
+.method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; }
+.method-grid > button { position: relative; min-height: 62px; display: grid; grid-template-columns: 31px minmax(0, 1fr); align-content: center; align-items: center; gap: 4px 9px; padding: 9px 11px; border: 1px solid rgb(194 83 57 / 24%); border-radius: 13px; color: var(--cazo-ink); background: var(--cazo-bg); text-align: left; cursor: pointer; transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease; }
+.method-grid > button:hover { border-color: rgb(194 83 57 / 58%); transform: translateY(-1px); }
+.method-grid > button:focus-visible { outline: 2px solid var(--cazo-brand); outline-offset: 2px; }
+.method-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 10px; color: var(--cazo-brand); background: rgb(194 83 57 / 9%); }
+.method-copy { min-width: 0; display: grid; gap: 3px; }
+.method-copy strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.method-copy small { color: var(--cazo-muted); font-size: 8px; }
+.method-grid > button.is-active { border-color: var(--cazo-brand); color: #fff; background: var(--cazo-brand); box-shadow: 0 8px 18px rgb(194 83 57 / 20%); }
+.method-grid > button.is-active .method-icon { color: var(--cazo-brand); background: var(--cazo-bg); }
+.method-grid > button.is-active .method-copy small { color: rgb(255 248 239 / 78%); }
+.selected { position: absolute; top: 10px; right: 10px; width: 17px; height: 17px; display: grid; place-items: center; border-radius: 50%; color: var(--cazo-brand); background: var(--cazo-bg); }
+
+/* Monto + cambio, copia del cash-grid del diseño. */
+.cash-grid { display: grid; grid-template-columns: 1fr 1.02fr; gap: 20px; }
+.cash-grid label { display: grid; gap: 7px; font-size: 9px; }
+.cash-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; overflow: hidden; border: 1px solid rgb(194 83 57 / 24%); border-radius: 13px; background: var(--cazo-bg); transition: border-color .16s ease, box-shadow .16s ease; }
+.cash-input:focus-within { border-color: var(--cazo-brand); box-shadow: 0 0 0 3px rgb(194 83 57 / 10%); }
+.cash-input input { width: 100%; min-width: 0; min-height: 54px; padding: 0 14px; border: 0; outline: 0; color: var(--cazo-ink); background: transparent; font: 650 20px 'Outfit Variable', Outfit, sans-serif; }
+.cash-input b { min-width: 40px; padding: 0 10px; color: var(--cazo-brand); font-size: 8px; font-weight: 850; text-align: right; }
+.change-card { min-height: 96px; display: grid; align-content: center; gap: 6px; padding: 13px 16px; border-radius: 14px; color: #fff8ef; background: var(--cazo-ink); }
+.change-card small { font-size: 8px; font-weight: 800; }
+.change-card strong { font: 500 25px/1 'Outfit Variable', Outfit, sans-serif; }
+.change-card span { font-size: 8px; }
+
+.quick-amounts { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 12px; }
+.quick-amounts > span { font-size: 9px; }
+.quick-amounts > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-amounts button { min-width: 78px; min-height: 29px; padding: 0 11px; border: 1px solid rgb(194 83 57 / 35%); border-radius: 999px; color: var(--cazo-ink); background: transparent; font-size: 9px; cursor: pointer; }
+.quick-amounts button:hover { border-color: var(--cazo-brand); color: var(--cazo-brand); background: var(--cazo-soft); }
+.quick-amounts__exact { color: #fff; background: var(--cazo-brand); }
+
+.payment-note { display: grid; gap: 7px; color: var(--cazo-ink); font-size: 9px; font-weight: 750; }
+.payment-note > span { color: var(--cazo-muted); }
+.payment-note textarea { width: 100%; min-width: 0; min-height: 62px; resize: vertical; padding: 9px 11px; border: 1px solid rgb(194 83 57 / 25%); border-radius: 10px; outline: 0; color: var(--cazo-ink); background: var(--cazo-bg); font: inherit; font-size: 11px; line-height: 1.35; }
+.payment-note textarea:focus-visible { border-color: var(--cazo-brand); box-shadow: 0 0 0 3px rgb(194 83 57 / 13%); }
+.payment-note textarea::placeholder { color: var(--cazo-muted); }
+
+/* Equivalencia informativa en divisas (solo display, el cobro se guarda en NIO). */
+.currency-legend { display: grid; gap: 9px; padding: 14px; border: 1px solid rgb(194 83 57 / 18%); border-radius: 16px; background: var(--cazo-soft); }
+.currency-legend__row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 96px 96px; align-items: center; gap: 10px; font-size: 10px; }
+.currency-legend__row--head { color: var(--cazo-muted); font-size: 8px; font-weight: 800; letter-spacing: .05em; text-align: right; }
+.currency-legend__row--head span { text-align: left; }
+.currency-legend__row small, .currency-legend__row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.currency-legend__row small { color: var(--cazo-muted); font-variant-numeric: tabular-nums; }
+.currency-legend__row:not(:first-child) { padding: 6px 0; border-top: 1px solid rgb(194 83 57 / 10%); }
+.currency-legend__row strong { color: var(--cazo-brand-strong); font-size: 10px; }
+
+.payment-modal footer { display: grid; gap: 10px; padding-top: 3px; }
+.payment-modal footer > span { color: var(--cazo-muted); font-size: 8px; }
+.payment-modal footer > span.integration-warning { color: #8e3020; font-weight: 750; }
+.payment-modal footer > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; padding-top: 10px; border-top: 1px solid rgb(194 83 57 / 16%); }
+.cancel, .confirm { min-height: 48px; border-radius: 12px; cursor: pointer; }
+.cancel { border: 1px solid rgb(194 83 57 / 35%); color: var(--cazo-ink); background: transparent; }
+.confirm { display: grid; grid-template-columns: 46px minmax(0, 1fr) 20px; align-items: center; gap: 8px; padding: 6px 10px; border: 0; color: #fff; background: var(--cazo-brand); }
+.confirm span { padding: 7px 5px; border: 1px solid rgb(255 248 239 / 55%); border-radius: 8px; font-size: 8px; }
+.confirm strong { font-size: 12px; }
+.cancel:disabled, .confirm:disabled, .close:disabled { opacity: .48; cursor: not-allowed; }
+
+@media (max-width: 680px) {
+  .modal-backdrop { padding: 8px; }
+  .payment-modal { gap: 13px; padding: 17px; border-radius: 20px; }
+  .method-grid { grid-template-columns: 1fr 1fr; }
+  .cash-grid { grid-template-columns: 1fr; }
+  .payment-details__heading { align-items: flex-start; flex-direction: column; }
+  .payment-details__base { max-width: none; text-align: left; }
+  .quick-amounts { grid-template-columns: 1fr; align-items: start; }
+  .currency-legend__row { grid-template-columns: 56px minmax(0, 1fr) 72px 72px; font-size: 9px; }
+  .payment-modal footer > div { grid-template-columns: 1fr; }
+}

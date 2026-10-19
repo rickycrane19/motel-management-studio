@@ -1,0 +1,44 @@
+:host { display: block; }
+.reports-stack { display: grid; gap: 18px; }
+
+// Rangos rápidos + fechas (America/Managua) dentro de la barra de filtros.
+.reports-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.reports-quick__range {
+  border: 1px solid var(--cazo-line-strong);
+  background: var(--cazo-surface);
+  color: var(--cazo-ink);
+  &:hover { border-color: var(--cazo-brand); color: var(--cazo-brand-strong); background: var(--cazo-soft); }
+  &.is-active { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); color: var(--cazo-brand-strong); }
+}
+.reports-date { display: block; min-width: 168px; }
+.reports-range { margin: 0; color: var(--cazo-muted); font-size: 12px; }
+
+// Contenedor imprimible: conserva el ritmo vertical de la página al agrupar el tab activo.
+.reports-print { display: grid; gap: 18px; }
+
+// Celdas de las tablas por pestaña.
+.reports-cell {
+  display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.reports-amount { font-variant-numeric: tabular-nums; }
+.reports-amount.is-income { color: var(--cazo-success); }
+.reports-amount.is-expense { color: var(--cazo-danger); }
+.reports-kind--income { color: var(--cazo-success); font-weight: 650; }
+.reports-kind--expense { color: var(--cazo-danger); font-weight: 650; }
+
+@media (max-width: 760px) {
+  .reports-quick { width: 100%; }
+  .reports-date { flex: 1 1 150px; min-width: 0; }
+}
+
+// Deja que las celdas envuelvan en papel: en pantalla recortan con puntos suspensivos.
+@media print {
+  .reports-cell strong,
+  .reports-cell small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}

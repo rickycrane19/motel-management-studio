@@ -1,0 +1,120 @@
+@if (loading()) {
+  <section class="rms-page room-form-loading" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir la habitación" [description]="message">
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="load()">Reintentar</button>
+      <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Volver a habitaciones</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar habitación' : 'Nueva habitación'"
+    eyebrow="PLANTA"
+    [subtitle]="isEdit ? 'Cambia lo que necesites; el monitor de habitaciones se actualiza al guardar.' : 'Cuéntanos cómo es la habitación. En tres pasos queda lista para recepcionar.'"
+    [backLink]="backLink" backLabel="Volver a la planta"
+    [steps]="steps()" [current]="step()" [maxReached]="reached()" [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside (stepSelect)="goTo($event)">
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes revisar la habitación, pero necesitas conexión para guardarla.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="room-form" novalidate>
+      @switch (step()) {
+        @case (0) {
+          <rms-panel title="¿Cómo se llama?" subtitle="El número es como la conoce el personal y la señalización.">
+            <div class="rms-form-grid">
+              <rms-field label="Número de habitación" required [error]="numberError()" hint="No puede repetirse entre las habitaciones habilitadas.">
+                <input class="rms-input" formControlName="roomNumber" maxlength="20" autocomplete="off" placeholder="Ej. 101" />
+              </rms-field>
+              <rms-field label="Tipo de habitación" required [error]="typeError()" hint="Define precio base, cochera y jacuzzi. Se administra en Catalogos.">
+                <rms-combobox formControlName="roomTypeId" [options]="roomTypes()" placeholder="Busca un tipo…" emptyText="No hay tipos con ese nombre" ariaLabel="Tipo de habitación" />
+              </rms-field>
+              <rms-field label="Piso" required [error]="floorError()" hint="Se usa para ordenar la planta en el monitor y el POS.">
+                <input class="rms-input" formControlName="floorNumber" type="number" inputmode="numeric" min="1" step="1" />
+              </rms-field>
+            </div>
+          </rms-panel>
+        }
+
+        @case (1) {
+          <rms-panel title="Notas para el personal" subtitle="Indicaciones visibles en la recepción, como episodios de limpieza o detalles de la habitación.">
+            <div class="rms-form-grid">
+              <rms-field label="Notas" optional hint="Máximo 200 caracteres." span="full">
+                <textarea class="rms-input" formControlName="notes" rows="3" maxlength="200" placeholder="Ej. Jacuzzi con cascada; recordar revisar drenaje."></textarea>
+              </rms-field>
+            </div>
+          </rms-panel>
+        }
+
+        @case (2) {
+          <rms-panel title="Disponibilidad" subtitle="Decide si ya se puede asignar y cobrar desde el POS.">
+            <div class="switch-list">
+              <label class="switch-card">
+                <input type="checkbox" class="rms-switch" formControlName="isActive" />
+                <span><strong>Habilitada en la planta</strong><small>Si la deshabilitas, se oculta del monitor y del POS, pero no se borra.</small></span>
+              </label>
+            </div>
+          </rms-panel>
+
+          <rms-panel title="Antes de guardar" subtitle="Revisa que no falte nada importante.">
+            <ul class="checklist">
+              @for (item of readiness(); track item.label) {
+                <li [class.is-done]="item.done">
+                  <span class="checklist__mark" aria-hidden="true"><rms-cazo-icon [name]="item.done ? 'check' : 'minus'" [size]="14" /></span>
+                  <span>{{ item.label }}</span>
+                  @if (!item.done) { <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" (click)="jump(item.step)">{{ item.optional ? 'Agregar' : 'Completar' }}</button> }
+                </li>
+              }
+            </ul>
+          </rms-panel>
+        }
+      }
+    </form>
+
+    <aside aside class="room-aside">
+      <rms-panel title="Vista previa" subtitle="Así se verá en la planta." raised>
+        <article class="preview-room" [class.is-off]="!isActiveValue()">
+          <div class="preview-room__icon" aria-hidden="true"><rms-cazo-icon name="bed" [size]="30" /></div>
+          <div class="preview-room__body">
+            <h3>{{ numberValue().trim() || 'Número de habitación' }}</h3>
+            <p>{{ typeLabel() || 'Elige el tipo de la habitación.' }}</p>
+            <small>Piso {{ floorValue() }}@if (notesValue().trim()) { · {{ notesValue() }} }</small>
+          </div>
+          @if (isActiveValue()) { <span class="preview-room__state">Habilitada</span> } @else { <span class="preview-room__state is-off">Deshabilitada</span> }
+        </article>
+      </rms-panel>
+      @if (step() !== lastStep()) {
+        <rms-panel title="Lista para publicar" raised>
+          <ul class="checklist checklist--compact">
+            @for (item of readiness(); track item.label) {
+              <li [class.is-done]="item.done"><span class="checklist__mark" aria-hidden="true"><rms-cazo-icon [name]="item.done ? 'check' : 'minus'" [size]="13" /></span><span>{{ item.label }}</span></li>
+            }
+          </ul>
+        </rms-panel>
+      }
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      @if (step() > 0) {
+        <button type="button" class="rms-btn rms-btn--secondary" (click)="previous()"><rms-cazo-icon name="arrow-left" [size]="16" /> Anterior</button>
+      }
+      @if (step() < lastStep()) {
+        <button type="button" class="rms-btn rms-btn--primary" (click)="next()">Siguiente <rms-cazo-icon name="arrow-right" [size]="16" /></button>
+      } @else {
+        <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online()" (click)="save()">
+          {{ saving() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear habitación' }}
+        </button>
+      }
+    </ng-container>
+  </rms-form-page>
+}

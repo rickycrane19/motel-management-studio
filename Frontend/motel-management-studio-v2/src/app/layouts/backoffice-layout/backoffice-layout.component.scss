@@ -1,0 +1,5 @@
+:host { display: block; min-height: 100vh; }
+.layout { min-height: 100vh; display: flex; color: var(--motel-ink); background: var(--motel-bg); }
+.layout__body { flex: 1; min-width: 0; }
+.layout__content { width: 100%; padding: 22px 28px 0; }
+@media (max-width: 760px) { .layout__content { padding: 24px 16px 40px; } }

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/MotelMS.Domain/MotelMS.Domain.csproj" />
+  <Project Path="src/MotelMS.Application/MotelMS.Application.csproj" />
+  <Project Path="src/MotelMS.Infrastructure/MotelMS.Infrastructure.csproj" />
+  <Project Path="src/MotelMS.WebAPI/MotelMS.WebAPI.csproj" />
+</Solution>

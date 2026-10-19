@@ -1,0 +1,169 @@
+@if (loading()) {
+  <section class="rms-page product-form-loading" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir el producto" [description]="message">
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="load()">Reintentar</button>
+      <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Volver a productos</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar producto' : 'Nuevo producto'"
+    eyebrow="MINIBAR"
+    [subtitle]="isEdit ? 'Cambia lo que necesites; los cambios llegan al minibar del POS al guardar.' : 'Cuéntanos qué vendes. En cuatro pasos queda listo para cobrarse.'"
+    [backLink]="backLink" backLabel="Volver a productos"
+    [steps]="steps()" [current]="step()" [maxReached]="reached()" [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside (stepSelect)="goTo($event)">
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes revisar el producto, pero necesitas conexión para guardarlo.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="product-form" novalidate>
+      @switch (step()) {
+        @case (0) {
+          <rms-panel title="¿Qué vendes?" subtitle="Esto es lo que verán en el minibar de cada habitación.">
+            <div class="rms-form-grid">
+              <rms-field label="Nombre del producto" required [error]="nameError()">
+                <input class="rms-input" formControlName="name" maxlength="200" autocomplete="off" placeholder="Ej. Agua mineral 600 ml" />
+              </rms-field>
+              <rms-field label="Código" required [error]="codeError()" hint="Un código corto para identificarlo rápido.">
+                <input class="rms-input" formControlName="code" maxlength="50" autocomplete="off" placeholder="Ej. AGUA-600" />
+              </rms-field>
+              <rms-field label="Categoría" required [error]="categoryError()" hint="Agrupa el minibar: bebidas, snacks, aseo…">
+                <rms-combobox formControlName="categoryId" [options]="categories()" placeholder="Busca una categoría…" [invalid]="!!categoryError()" ariaLabel="Categoría" />
+              </rms-field>
+              <rms-field label="Unidad de medida" hint="Cómo se cuenta: unidad, kilo, litro…">
+                <rms-combobox formControlName="unitOfMeasure" [options]="units()" [clearable]="false" placeholder="Unidad" ariaLabel="Unidad de medida" />
+              </rms-field>
+              <rms-field label="Descripción" optional hint="Una frase corta para el detalle." span="full">
+                <textarea class="rms-input" formControlName="description" rows="3" maxlength="500" placeholder="Describe el producto en una o dos frases."></textarea>
+              </rms-field>
+            </div>
+          </rms-panel>
+
+          <rms-panel title="Foto del producto" subtitle="Una buena foto vende más. Es opcional: puedes agregarla después.">
+            <div class="photo-grid">
+              <rms-file-drop [previewUrl]="photoPreview()" [previewAlt]="nameValue() || 'Foto del producto'" subject="foto"
+                label="Arrastra una foto o haz clic para elegirla" hint="JPG, PNG o WebP · hasta 5 MB"
+                [disabled]="saving() || !network.online()" (fileSelected)="onImage($event)" (removed)="removeImage()" (rejected)="imageError.set($event)" />
+              <div class="photo-grid__side">
+                @if (imageError(); as message) { <rms-notice tone="warning">{{ message }}</rms-notice> }
+              </div>
+            </div>
+          </rms-panel>
+        }
+
+        @case (1) {
+          <rms-panel title="Costo" subtitle="Cuánto te cuesta comprarlo. Sirve para calcular tu ganancia.">
+            <div class="rms-form-grid rms-form-grid--2">
+              <rms-field label="Costo" required [error]="costError()" hint="Costo por unidad en córdobas.">
+                <input class="rms-input" formControlName="costPrice" type="number" inputmode="decimal" min="0" step="0.01" />
+              </rms-field>
+              <rms-field label="Ganancia por unidad" hint="Se calcula sola: precio − costo.">
+                <output class="rms-input rms-input--readonly">{{ money(saleAmount() - toNumber(form.controls.costPrice.value)) }}</output>
+              </rms-field>
+            </div>
+          </rms-panel>
+
+          <rms-panel title="Precio de venta" subtitle="Es lo que se cobra al consumo desde el minibar.">
+            <div class="rms-form-grid rms-form-grid--2">
+              <rms-field label="Precio de venta" required [error]="saleError()">
+                <input class="rms-input" formControlName="salePrice" type="number" inputmode="decimal" min="0" step="0.01" />
+              </rms-field>
+              <rms-field label="Vista previa" hint="Así se verá en el minibar del POS.">
+                <output class="rms-input rms-input--readonly rms-input--strong">{{ money(saleAmount()) }}</output>
+              </rms-field>
+            </div>
+          </rms-panel>
+        }
+
+        @case (2) {
+          <rms-panel title="Existencias" subtitle="Dile cuántas unidades hay y cuándo avisar que se está acabando.">
+            <div class="rms-form-grid rms-form-grid--2">
+              <rms-field label="Stock actual" required [error]="stockError()" [hint]="isEdit ? 'El stock se ajusta con los movimientos de inventario, no aquí.' : 'Cuántas unidades hay ahora mismo.'">
+                <input class="rms-input" formControlName="currentStock" type="number" inputmode="numeric" min="0" step="1" [readonly]="isEdit" />
+              </rms-field>
+              <rms-field label="Stock mínimo" required [error]="minStockError()" hint="Al bajar de aquí se marca «stock bajo».">
+                <input class="rms-input" formControlName="minStock" type="number" inputmode="numeric" min="0" step="1" />
+              </rms-field>
+            </div>
+            @if (isEdit) {
+              <rms-notice tone="info" title="El stock se mueve con consumos y ajustes">Al editarlo aquí el stock no cambia: se descuenta con cada venta del minibar y se corrige desde Movimientos de inventario.</rms-notice>
+            }
+          </rms-panel>
+        }
+
+        @case (3) {
+          <rms-panel title="Disponibilidad" subtitle="Decide si ya se puede ver y vender desde el minibar.">
+            <div class="switch-list">
+              <label class="switch-card">
+                <input type="checkbox" class="rms-switch" formControlName="isActive" />
+                <span><strong>Visible en el minibar</strong><small>Si lo apagas, se oculta del POS, pero no se borra.</small></span>
+              </label>
+            </div>
+          </rms-panel>
+
+          <rms-panel title="Antes de guardar" subtitle="Revisa que no falte nada importante.">
+            <ul class="checklist">
+              @for (item of readiness(); track item.label) {
+                <li [class.is-done]="item.done">
+                  <span class="checklist__mark" aria-hidden="true"><rms-cazo-icon [name]="item.done ? 'check' : 'minus'" [size]="14" /></span>
+                  <span>{{ item.label }}</span>
+                  @if (!item.done) { <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" (click)="jump(item.step)">{{ item.optional ? 'Agregar' : 'Completar' }}</button> }
+                </li>
+              }
+            </ul>
+          </rms-panel>
+        }
+      }
+    </form>
+
+    <aside aside class="product-aside">
+      <rms-panel title="Vista previa" subtitle="Así se verá en el minibar." raised>
+        <article class="preview-card">
+          <div class="preview-card__image" [class.is-empty]="!hasImage()">
+            <img [src]="cardImage()" [alt]="nameValue() || 'Producto sin foto'" />
+            @if (isActiveValue()) { <span>Disponible</span> } @else { <span class="is-off">Oculto</span> }
+          </div>
+          <div class="preview-card__body">
+            <h3>{{ nameValue().trim() || 'Nombre del producto' }}</h3>
+            <p>{{ descriptionValue().trim() || 'La descripción aparecerá aquí.' }}</p>
+            <strong>{{ money(saleAmount()) }}</strong>
+          </div>
+        </article>
+      </rms-panel>
+      @if (step() !== 3) {
+        <rms-panel title="Lista para publicar" raised>
+          <ul class="checklist checklist--compact">
+            @for (item of readiness(); track item.label) {
+              <li [class.is-done]="item.done"><span class="checklist__mark" aria-hidden="true"><rms-cazo-icon [name]="item.done ? 'check' : 'minus'" [size]="13" /></span><span>{{ item.label }}</span></li>
+            }
+          </ul>
+        </rms-panel>
+      }
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      @if (step() > 0) {
+        <button type="button" class="rms-btn rms-btn--secondary" (click)="previous()"><rms-cazo-icon name="arrow-left" [size]="16" /> Anterior</button>
+      }
+      @if (step() < lastStep()) {
+        <button type="button" class="rms-btn rms-btn--primary" (click)="next()">Siguiente <rms-cazo-icon name="arrow-right" [size]="16" /></button>
+      } @else {
+        <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online()" (click)="save()">
+          {{ saving() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear producto' }}
+        </button>
+      }
+    </ng-container>
+  </rms-form-page>
+}

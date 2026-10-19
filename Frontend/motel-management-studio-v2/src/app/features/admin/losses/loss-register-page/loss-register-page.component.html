@@ -1,0 +1,84 @@
+<rms-form-page title="Registrar pérdida" eyebrow="FINANZAS"
+  subtitle="Daño de cuarto, minibar mal gestionado, faltante de caja u otro. La pérdida queda documentada y opcionalmente se descuenta del efectivo del turno."
+  [backLink]="backLink" backLabel="Volver a pérdidas" [busy]="saving()" withAside
+  [status]="form.dirty ? 'Cambios sin guardar' : null">
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Necesitas conexión para registrar la pérdida.</rms-notice>
+  }
+  @if (!canRegister()) {
+    <rms-notice tone="danger" title="No tienes permiso para registrar pérdidas">Pídele a quien administra tu negocio que habilite el permiso de finanzas.</rms-notice>
+  }
+  @if (error(); as message) {
+    <rms-notice tone="danger" title="No se pudo continuar" dismissible (dismissed)="error.set(null)">{{ message }}</rms-notice>
+  }
+  @if (!loadingSession() && !activeSession() && canRegister()) {
+    <rms-notice tone="info" title="No hay caja abierta">La pérdida quedará registrada solo en reportes: no se descuenta de ningún turno.</rms-notice>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="save()" class="loss-form" novalidate>
+    <rms-panel title="¿Qué se perdió?" subtitle="La categoría ordena el reporte de pérdidas del motel.">
+      <rms-field-group label="Categoría de la pérdida" required [error]="categoryError()">
+        <div class="loss-choice" role="radiogroup" aria-label="Categoría de la pérdida">
+          @for (code of categories; track code) {
+            <button type="button" role="radio" [attr.aria-checked]="categoryCode() === code"
+              [class.is-selected]="categoryCode() === code" (click)="chooseCategory(code)">
+              <span><strong>{{ categoryLabels[code] }}</strong><small>{{ lossHint(code) }}</small></span>
+            </button>
+          }
+        </div>
+      </rms-field-group>
+    </rms-panel>
+
+    <rms-panel title="Monto y detalle" subtitle="El monto se registra en la moneda del negocio.">
+      <div class="rms-form-grid">
+        <rms-field label="Monto de la pérdida" required [error]="amountError()" [hint]="'Se guarda en ' + currencyCode() + ' (C$).'">
+          <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="amount"
+            aria-label="Monto de la pérdida" placeholder="Ej. 250.00" />
+        </rms-field>
+        <rms-field label="Cuarto" optional hint="Solo si la pérdida ocurrió en un cuarto.">
+          <rms-combobox formControlName="roomId" [loader]="searchRooms" [selectedOptions]="selectedRoomOption()"
+            placeholder="Busca el cuarto…" emptyText="No encontramos cuartos activos con ese número"
+            ariaLabel="Cuarto de la pérdida" (optionSelected)="roomPicked($event)" />
+        </rms-field>
+        <rms-field label="Qué pasó" [error]="descriptionError()" span="full"
+          hint="Cuéntalo en una frase: qué se dañó, faltó o se perdió.">
+          <textarea class="rms-input" formControlName="description" rows="3" maxlength="300"
+            aria-label="Descripción de la pérdida" placeholder="Ej. Cortina rota en el cuarto 103"></textarea>
+        </rms-field>
+      </div>
+    </rms-panel>
+
+    <rms-panel title="Efectivo del turno" subtitle="Descontar la pérdida de la caja abierta arquea el turno con el faltante.">
+      <label class="rms-switch">
+        <input type="checkbox" [checked]="deductFromCash()" [disabled]="!activeSession()" (change)="toggleDeduct($event)" />
+        <span>Descontar de la caja del turno</span>
+      </label>
+      @if (loadingSession()) {
+        <p class="rms-muted loss-note" role="status">Buscando la sesión de caja abierta…</p>
+      } @else if (activeSession(); as active) {
+        <p class="rms-muted loss-note">Turno activo: {{ active.shiftName }} · {{ active.cashBoxName }} (sesión #{{ active.cashBoxSessionId }}).</p>
+      } @else {
+        <p class="rms-muted loss-note">No hay caja abierta: la pérdida quedará solo en reportes.</p>
+      }
+    </rms-panel>
+  </form>
+
+  <aside aside>
+    <rms-panel title="Resumen de la pérdida" raised>
+      <ul class="loss-summary">
+        <li><span>Categoría</span><strong>{{ categoryCode() ? categoryLabels[categoryCode()!] : '—' }}</strong></li>
+        <li><span>Cuarto</span><strong>{{ selectedRoomOption().length ? selectedRoomOption()[0].label : 'No aplica' }}</strong></li>
+        <li><span>Monto</span><strong>{{ amount() > 0 ? 'C$ ' + (amount() | number:'1.2-2') : '—' }}</strong></li>
+        <li><span>Efectivo del turno</span><strong>{{ deductFromCash() && activeSession() ? 'Sí, se descuenta' : 'No se descuenta' }}</strong></li>
+      </ul>
+    </rms-panel>
+  </aside>
+
+  <ng-container footer>
+    <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Cancelar</a>
+    <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online() || !canRegister()" (click)="save()">
+      @if (saving()) { <span class="rms-spinner"></span> Registrando… } @else { <rms-cazo-icon name="check" [size]="16" /> Registrar pérdida }
+    </button>
+  </ng-container>
+</rms-form-page>

@@ -1,0 +1,36 @@
+:host { display: block; }
+.res-stack { display: grid; gap: 18px; }
+
+.res-date { display: block; width: 150px; }
+
+.res-cell {
+  display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &--end { text-align: end; }
+}
+
+.res-avatar {
+  width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border-radius: 14px;
+  color: var(--cazo-brand-strong); background: var(--cazo-brand-soft);
+  font: 700 13px/1 var(--cazo-font-display); letter-spacing: .02em;
+}
+
+.res-detail {
+  display: grid; gap: 16px;
+  &__head { display: flex; align-items: center; gap: 14px;
+    div { display: grid; gap: 2px; min-width: 0; }
+    strong { font: 650 17px/1.2 var(--cazo-font-display); letter-spacing: -.01em; }
+    small { color: var(--cazo-muted); font-size: 13px; } }
+  &__list { display: grid; gap: 12px; margin: 0;
+    div { display: grid; gap: 3px; }
+    dt { color: var(--cazo-muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+    dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; } }
+  &__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+}
+
+.res-form {
+  display: grid; gap: 18px;
+  &__hint { margin: 0; color: var(--cazo-muted); font-size: 12.5px; line-height: 1.55; }
+  &__actions { display: flex; justify-content: flex-end; gap: 10px; }
+}

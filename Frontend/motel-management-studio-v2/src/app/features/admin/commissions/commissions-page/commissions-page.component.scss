@@ -1,0 +1,12 @@
+.hr-stack { display: grid; gap: 20px; }
+
+.comm-cell { display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 13px; }
+  small { color: var(--cazo-muted); font-size: 12px; }
+}
+
+.comm-form { display: grid; gap: 18px; }
+.comm-form__hint { margin: 0; color: var(--cazo-muted); font-size: 12px; line-height: 1.5; }
+.comm-form__actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; }

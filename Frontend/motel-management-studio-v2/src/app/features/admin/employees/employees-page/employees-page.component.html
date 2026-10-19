@@ -1,0 +1,251 @@
+<section class="rms-page hr-stack">
+  <rms-page-header eyebrow="RECURSOS HUMANOS" title="Empleados"
+    subtitle="Tu equipo en un solo lugar: quién es, en qué puesto trabaja y cómo se le paga.">
+    @if (canManage()) {
+      <a actions class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!network.online()">
+        <rms-cazo-icon name="plus" [size]="18" /> Nuevo empleado
+      </a>
+    }
+  </rms-page-header>
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Puedes consultar lo que ya cargó. Para dar de alta o cambiar empleados necesitas conexión.</rms-notice>
+  }
+
+  <div class="rms-stats" aria-label="Resumen del equipo">
+    <rms-stat-card label="Empleados" [value]="store.stats().total" hint="Registrados en el motel" icon="users" tone="brand" [loading]="store.status() === 'loading' && store.employees().length === 0" />
+    <rms-stat-card label="Vigentes" [value]="store.stats().active" hint="Activos este periodo" icon="check" [loading]="store.status() === 'loading' && store.employees().length === 0" />
+    <rms-stat-card label="Inactivos" [value]="store.stats().inactive" hint="De baja o desactivados" icon="eye-off" [loading]="store.status() === 'loading' && store.employees().length === 0" />
+  </div>
+
+  <rms-filter-bar placeholder="Buscar por nombre, puesto o teléfono…" [search]="store.query().search" [activeCount]="store.activeFilterCount()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+    <rms-combobox filters [options]="paymentTypeOptions" [formControl]="paymentTypeControl" placeholder="Todas las modalidades" emptyText="No hay modalidades con ese nombre" ariaLabel="Filtrar por modalidad de pago" />
+    <rms-combobox filters [options]="statusOptions" [formControl]="statusControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+  </rms-filter-bar>
+
+  <rms-data-table [columns]="columns" [rows]="store.employees()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()"
+    errorTitle="No pudimos cargar a tu equipo" caption="Directorio de empleados" [trackBy]="trackEmployee" [rowClickable]="true" (rowClick)="open($event)" (retry)="reload()"
+    emptyTitle="Todavía no hay empleados" emptyDescription="Da de alta al primer empleado para armar la nómina y registrar sus pagos.">
+    <ng-template rmsCell="person" let-row>
+      <div class="hr-person">
+        <span class="hr-avatar" [class.is-off]="!row.isActive" aria-hidden="true">{{ initials(row) }}</span>
+        <span class="hr-cell"><strong>{{ row.fullName }}</strong><small>@if (row.phone) { <rms-cazo-icon name="phone" [size]="12" /> {{ row.phone }} } @else { Sin teléfono }</small></span>
+      </div>
+    </ng-template>
+    <ng-template rmsCell="job" let-row>
+      <span class="hr-cell"><strong>{{ row.position }}</strong><small>Puesto asignado</small></span>
+    </ng-template>
+    <ng-template rmsCell="pay" let-row>
+      <span class="hr-cell"><strong class="num">{{ row.currencyCode }} {{ row.rate | number:'1.2-2' }}</strong><small>{{ row.paymentTypeName || paidLabel(row) }}</small></span>
+    </ng-template>
+    <ng-template rmsCell="since" let-row>
+      <span class="hr-cell"><strong>{{ row.createdOn | date:'d MMM y' }}</strong><small>{{ row.createdOn | date:'h:mm a':'America/Managua' }}</small></span>
+    </ng-template>
+    <ng-template rmsCell="status" let-row>
+      <rms-status-badge [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Vigente' : 'Inactivo' }}</rms-status-badge>
+    </ng-template>
+    <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+      label="empleados" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+  </rms-data-table>
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.fullName ?? 'Empleado'" [subtitle]="selected()?.position ?? null" eyebrow="Ficha del empleado" (closed)="closeDetail()">
+  @if (selected(); as employee) {
+    <ng-container>
+      <div class="hr-detail">
+      <dl class="hr-facts">
+        <div><dt>Nombre completo</dt><dd>{{ employee.fullName }}</dd></div>
+        <div><dt>Puesto</dt><dd>{{ employee.position }}</dd></div>
+        <div><dt>Modalidad de pago</dt><dd>{{ paymentLabel(employee.paymentType) }}</dd></div>
+        <div><dt>Salario / tarifa</dt><dd>{{ employee.currencyCode }} {{ employee.rate | number:'1.2-2' }}</dd></div>
+        <div><dt>Comisión sobre ventas</dt><dd>{{ employee.commissionRatePercent | number:'1.0-2' }} %</dd></div>
+        <div><dt>Teléfono</dt><dd>{{ employee.phone || '—' }}</dd></div>
+        <div><dt>Registrado</dt><dd>{{ employee.createdOn | date:'d MMM y, h:mm a':'America/Managua' }}</dd></div>
+      </dl>
+
+      <div class="hr-detail__pay">
+        <div class="hr-detail__pay-head">
+          <h3>Contrato vigente</h3>
+          @if (canManage()) {
+            <a class="rms-btn rms-btn--ghost rms-btn--sm" routerLink="contratos/nuevo" [queryParams]="{ employeeId: employee.employeeId }" (click)="closeDetail()">
+              <rms-cazo-icon name="plus" [size]="14" /> Nuevo contrato
+            </a>
+          }
+        </div>
+
+        @if (contractsLoading()) {
+          <p class="rms-muted" role="status">Consultando contratos…</p>
+        } @else if (contracts().length === 0) {
+          <p class="rms-muted">Este empleado todavía no tiene contrato vigente: los pagos se registran con la modalidad de su ficha.</p>
+        } @else {
+          <ul class="hr-list">
+            @for (contract of contracts(); track contract.contractId) {
+              <li>
+                <span>
+                  <strong>{{ contract.position }}</strong>
+                  <small>{{ contract.paymentTypeName || paymentLabel(contract.paymentType) }} · {{ contract.currencyCode }} {{ contract.baseAmount | number:'1.2-2' }}</small>
+                  <small>
+                    Desde {{ contract.startDate | date:'d MMM y':'UTC' }}@if (contract.endDate) { hasta {{ contract.endDate | date:'d MMM y':'UTC' }} } @else { sin fecha de fin }
+                    @if (contract.scheduleNotes) { · {{ contract.scheduleNotes }} }
+                  </small>
+                </span>
+                @if (canManage()) {
+                  <a class="rms-btn rms-btn--ghost rms-btn--sm nowrap" [routerLink]="['contratos', contract.contractId, 'editar']"
+                    [attr.aria-label]="'Editar el contrato de ' + employee.fullName" (click)="closeDetail()">Editar</a>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="hr-detail__pay">
+        <div class="hr-detail__pay-head">
+          <h3>Pagos a este empleado</h3>
+          @if (canManage()) {
+            <button type="button" class="rms-btn rms-btn--secondary rms-btn--sm" [disabled]="!network.online()" (click)="togglePaymentForm()">
+              <rms-cazo-icon name="plus" [size]="15" /> {{ paymentFormOpen() ? 'Cerrar formulario' : 'Registrar pago' }}
+            </button>
+          }
+        </div>
+
+        @if (paymentsError(); as message) {
+          <rms-notice tone="danger" [title]="'No pudimos cargar o registrar el pago'">{{ message }}</rms-notice>
+        }
+
+        @if (paymentFormOpen()) {
+          <form [formGroup]="paymentForm" (ngSubmit)="savePayment()" class="hr-inline-form" novalidate>
+            <div class="hr-choice" role="radiogroup" aria-label="Modalidad del pago">
+              @for (option of paymentKinds; track option.value) {
+                <button type="button" role="radio" [attr.aria-checked]="paymentKindValue() === option.value"
+                  [class.is-selected]="paymentKindValue() === option.value" (click)="selectPaymentKind(option.value)">
+                  <strong>{{ option.label }}</strong><small>{{ option.hint }}</small>
+                </button>
+              }
+            </div>
+
+            @if (paymentKindValue() === 'extra') {
+              <div class="rms-form-grid">
+                <rms-field label="Se paga como" required span="full"
+                  [hint]="'Sugerencia: ' + paymentCurrency() + ' ' + (suggestedRate() | number:'1.2-2') + ' (el día extra sale del salario mensual entre 30). Puedes ajustarla.'">
+                  <rms-combobox formControlName="extraType" [options]="extraPaymentTypes" [clearable]="false" ariaLabel="Modalidad del turno extra" />
+                </rms-field>
+              </div>
+            }
+
+            <div class="rms-form-grid">
+              <rms-field label="Periodo desde" required>
+                <rms-date-field formControlName="periodStart" ariaLabel="Inicio del periodo" />
+              </rms-field>
+              <rms-field label="Periodo hasta" required>
+                <rms-date-field formControlName="periodEnd" ariaLabel="fin del periodo" />
+              </rms-field>
+              <rms-field label="Unidades trabajadas" required [hint]="paymentUnitsHint()">
+                <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.5" formControlName="unitsWorked" aria-label="Unidades trabajadas" />
+              </rms-field>
+              <rms-field label="Tarifa aplicada" required [hint]="'En ' + paymentCurrency()">
+                <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="rateApplied" aria-label="Tarifa aplicada" />
+              </rms-field>
+              <rms-field label="Bonos" optional>
+                <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="bonusAmount" aria-label="Monto de bonos" />
+              </rms-field>
+              <rms-field label="Notas" optional span="full">
+                <input class="rms-input" formControlName="notes" maxlength="250" aria-label="Notas del pago"
+                  [placeholder]="paymentKindValue() === 'extra' ? 'Ej. Turno extra de noche del viernes' : 'Ej. Quincena del 1 al 15'" />
+              </rms-field>
+            </div>
+
+            <div class="hr-deductions" formArrayName="deductions">
+              <div class="hr-deductions__head">
+                <span class="hr-deductions__title">Deducciones <small>INSS, IR, préstamos o adelantos</small></span>
+                <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" (click)="addDeduction()">
+                  <rms-cazo-icon name="plus" [size]="14" /> Agregar deducción
+                </button>
+              </div>
+              @for (row of deductions.controls; track row; let index = $index) {
+                <div class="hr-deduction-row" [formGroupName]="index">
+                  <rms-combobox formControlName="type" [options]="deductionTypes" [clearable]="false" ariaLabel="Tipo de deducción" />
+                  <input class="rms-input" formControlName="description" maxlength="120" placeholder="Detalle (opcional)" aria-label="Detalle de la deducción" />
+                  <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="amount" aria-label="Monto de la deducción" />
+                  <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" (click)="removeDeduction(index)" aria-label="Quitar deducción">
+                    <rms-cazo-icon name="trash" [size]="14" />
+                  </button>
+                </div>
+              }
+              <p class="hr-deductions__total">Total deducido: <strong class="num">{{ money(deductionsTotal(), paymentCurrency()) }}</strong></p>
+            </div>
+
+            <div class="switch-list">
+              <label class="switch-card" [class.is-off]="!activeSession()">
+                <input type="checkbox" class="rms-switch" formControlName="fromCashBox" [disabled]="!activeSession()" />
+                <span>
+                  <strong>Pagar desde la caja del turno</strong>
+                  @if (sessionLoading()) {
+                    <small>Consultando la caja abierta…</small>
+                  } @else if (activeSession(); as cashSession) {
+                    <small>Sale del efectivo de {{ cashSession.cashBoxName }}@if (cashSession.shiftName) { · {{ cashSession.shiftName }} } y queda como egreso «Pago de nómina» en el arqueo.</small>
+                  } @else if (sessionError()) {
+                    <small>No pudimos consultar la caja abierta. Registra el pago sin caja o vuelve a abrir la ficha.</small>
+                  } @else {
+                    <small>No hay una caja abierta en este turno. Abre una en Caja para pagar el turno extra con efectivo.</small>
+                  }
+                </span>
+              </label>
+            </div>
+
+            <p class="hr-inline-total">
+              Se registrará <strong>{{ effectivePaymentTypeLabel() }}</strong> por
+              <strong class="num">{{ money(paymentTotal(), paymentCurrency()) }}</strong>
+              @if (paymentForm.controls.fromCashBox.value && activeSession(); as cashSession) { · desde {{ cashSession.cashBoxName }} }
+            </p>
+
+            <div class="hr-inline-actions">
+              <button type="button" class="rms-btn rms-btn--ghost" (click)="togglePaymentForm()">Cancelar</button>
+              <button type="submit" class="rms-btn rms-btn--primary" [disabled]="paymentSaving() || !network.online()">
+                @if (paymentSaving()) { <span class="rms-spinner"></span> Registrando… } @else { <rms-cazo-icon name="check" [size]="16" /> Registrar pago }
+              </button>
+            </div>
+          </form>
+        }
+
+        @if (paymentsLoading() && payments().length === 0) {
+          <p class="rms-muted" role="status">Consultando pagos…</p>
+        } @else if (payments().length === 0) {
+          <p class="rms-muted">Todavía no se le han registrado pagos.</p>
+        } @else {
+          <ul class="hr-list">
+            @for (payment of payments(); track payment.paymentId) {
+              <li>
+                <span>
+                  <strong class="num">{{ money(payment.netPaid, payment.currencyCode) }}</strong>
+                  <small>
+                    Del {{ payment.periodStart | date:'d MMM y':'UTC' }} al {{ payment.periodEnd | date:'d MMM y':'UTC' }} · {{ paymentLabel(payment.paymentType) }}
+                    @if (payment.isExtraShift) { · Turno extra }
+                  </small>
+                  <small>
+                    Bruto {{ money(payment.baseAmount + payment.bonusAmount, payment.currencyCode) }}
+                    @if (payment.deductionsAmount > 0) { · Deducciones {{ money(payment.deductionsAmount, payment.currencyCode) }} ({{ payment.deductionsCount }}) }
+                    · @if (payment.paidFromCashBoxSessionId) { Salió de la caja del turno } @else { No tocó la caja }
+                    @if (payment.notes) { · {{ payment.notes }} }
+                  </small>
+                </span>
+                <small class="hr-list__when">{{ payment.paidAtUtc | date:'d MMM y, h:mm a':'America/Managua' }}</small>
+              </li>
+            }
+          </ul>
+          @if (payments().length < paymentsTotal()) {
+            <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" [disabled]="paymentsLoading()" (click)="loadMorePayments()">
+              @if (paymentsLoading()) { <span class="rms-spinner"></span> Cargando… } @else { Ver más pagos ({{ payments().length }} de {{ paymentsTotal() }}) }
+            </button>
+          }
+        }
+      </div>
+    </div>
+    <div footer class="drawer-actions">
+      @if (canManage()) {
+        <a class="rms-btn rms-btn--primary drawer-actions__wide" [routerLink]="[employee.employeeId, 'editar']" (click)="closeDetail()"><rms-cazo-icon name="edit" [size]="16" /> Editar ficha</a>
+      }
+    </div>
+    </ng-container>
+  }
+</rms-drawer>

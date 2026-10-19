@@ -1,0 +1,161 @@
+<section class="rms-page customers-stack">
+  <rms-page-header eyebrow="HABITACIONES" title="Clientes"
+    subtitle="Fichas de contacto de quienes se hospedan en el motel. El listado se pagina en el servidor y las tarjetas salen del mismo SP.">
+    @if (canManage()) {
+      <button actions type="button" class="rms-btn rms-btn--primary" [disabled]="!network.online()" (click)="openCreate()">
+        <rms-cazo-icon name="plus" [size]="18" /> Nuevo cliente
+      </button>
+    }
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de habitaciones">Tu rol no puede consultar los clientes. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar los clientes cargados. Para crear, editar o desactivar una ficha necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de clientes">
+      <rms-stat-card label="Clientes" [value]="store.stats().total" hint="Registrados en el motel" icon="users" tone="brand" [loading]="store.status() === 'loading' && store.customers().length === 0" />
+      <rms-stat-card label="Activos" [value]="store.stats().active" hint="Disponibles para nuevas reservas" icon="check" [loading]="store.status() === 'loading' && store.customers().length === 0" />
+      <rms-stat-card label="Con contacto" [value]="store.stats().withContact" hint="Tienen teléfono o correo" icon="phone" [loading]="store.status() === 'loading' && store.customers().length === 0" />
+    </div>
+
+    <rms-filter-bar placeholder="Buscar por nombre, documento, teléfono o correo…" [search]="store.query().search" [activeCount]="store.activeFilterCount()"
+      (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <rms-combobox filters [options]="statusOptions" [formControl]="statusFilter" [clearable]="false" ariaLabel="Filtrar por estado" />
+    </rms-filter-bar>
+
+    <rms-data-table [columns]="columns" [rows]="store.customers()" [loading]="store.status() === 'loading'"
+      [error]="store.errorMessage()" errorTitle="No pudimos cargar los clientes" caption="Clientes"
+      [trackBy]="trackCustomer" [rowClickable]="true" (rowClick)="open($event)" (retry)="store.load(store.query())"
+      [emptyKind]="store.activeFilterCount() ? 'search' : 'empty'"
+      [emptyTitle]="store.activeFilterCount() ? 'No encontramos clientes con esos filtros' : 'Todavía no hay clientes'"
+      [emptyDescription]="store.activeFilterCount() ? 'Prueba con otra palabra o limpia los filtros.' : 'Registra la primera ficha para tener a mano el contacto de tus huéspedes.'">
+      <ng-template rmsCell="customer" let-row>
+        <div class="customers-person">
+          <span class="customers-avatar" aria-hidden="true">{{ initialsOf(row) }}</span>
+          <span class="customers-cell">
+            <strong>{{ row.fullName }}</strong>
+            <small>ID {{ row.customerId }}</small>
+          </span>
+        </div>
+      </ng-template>
+      <ng-template rmsCell="contact" let-row>
+        <span class="customers-cell">
+          <strong>{{ row.phone || 'Sin teléfono' }}</strong>
+          <small>{{ row.email || 'Sin correo' }}</small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="document" let-row>
+        <span class="customers-cell"><strong>{{ row.documentNumber || '—' }}</strong><small>Documento</small></span>
+      </ng-template>
+      <ng-template rmsCell="since" let-row>
+        <span class="customers-cell"><strong>{{ row.createdOn | date:'d MMM y' }}</strong><small>{{ row.createdOn | date:'h:mm a':'America/Managua' }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="status" let-row>
+        <rms-status-badge [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Activo' : 'Inactivo' }}</rms-status-badge>
+      </ng-template>
+      <ng-template rmsCell="actions" let-row>
+        <div class="row-actions">
+          @if (canManage()) {
+            <button type="button" class="rms-icon-btn" [disabled]="!network.online()" (click)="openEdit(row); $event.stopPropagation()"
+              [attr.aria-label]="'Editar a ' + row.fullName" title="Editar cliente">
+              <rms-cazo-icon name="edit" [size]="16" />
+            </button>
+            <button type="button" class="rms-icon-btn" [disabled]="!network.online()" (click)="toggleActive(row, $event)"
+              [attr.aria-label]="(row.isActive ? 'Desactivar a ' : 'Activar a ') + row.fullName"
+              [title]="row.isActive ? 'Desactivar cliente' : 'Activar cliente'">
+              <rms-cazo-icon [name]="row.isActive ? 'close' : 'check'" [size]="16" />
+            </button>
+          }
+        </div>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()"
+        [loading]="store.status() === 'loading'" label="clientes" [pageSizeOptions]="pageSizes"
+        (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.fullName ?? 'Cliente'" eyebrow="Ficha del cliente" (closed)="closeDetail()">
+  @if (selected(); as customer) {
+    <div class="customers-detail">
+      <div class="customers-detail__head">
+        <span class="customers-avatar customers-avatar--lg" aria-hidden="true">{{ initialsOf(customer) }}</span>
+        <div>
+          <strong>{{ customer.fullName }}</strong>
+          <small>{{ customer.phone || customer.email || 'Sin datos de contacto' }}</small>
+        </div>
+      </div>
+      <dl class="customers-detail__list">
+        <div><dt>Documento</dt><dd>{{ customer.documentNumber || '—' }}</dd></div>
+        <div><dt>Teléfono</dt><dd>{{ customer.phone || '—' }}</dd></div>
+        <div><dt>Correo</dt><dd>{{ customer.email || '—' }}</dd></div>
+        <div><dt>Estado</dt><dd><rms-status-badge [tone]="customer.isActive ? 'success' : 'neutral'">{{ customer.isActive ? 'Activo' : 'Inactivo' }}</rms-status-badge></dd></div>
+        <div><dt>Cliente desde</dt><dd>{{ customer.createdOn | date:'d MMM y, h:mm a':'America/Managua' }}</dd></div>
+        <div><dt>Notas</dt><dd>{{ customer.notes || 'Sin notas' }}</dd></div>
+      </dl>
+      @if (canManage()) {
+        <div class="customers-detail__actions">
+          <button type="button" class="rms-btn rms-btn--primary" [disabled]="!network.online()" (click)="openEdit(customer)">
+            <rms-cazo-icon name="edit" [size]="16" /> Editar ficha
+          </button>
+          <button type="button" class="rms-btn rms-btn--ghost" [disabled]="!network.online()" (click)="toggleActive(customer, $event)">
+            <rms-cazo-icon [name]="customer.isActive ? 'close' : 'check'" [size]="16" />
+            {{ customer.isActive ? 'Desactivar cliente' : 'Activar cliente' }}
+          </button>
+        </div>
+      }
+    </div>
+  }
+</rms-drawer>
+
+<rms-drawer [open]="formOpen()" [title]="editingId() === null ? 'Nuevo cliente' : 'Editar cliente'"
+  subtitle="Contacto y documento" eyebrow="Clientes" (closed)="closeForm()">
+  <form [formGroup]="form" (ngSubmit)="save()" class="customers-form" novalidate>
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No pudimos guardar el cliente">{{ message }}</rms-notice>
+    }
+
+    <div class="rms-form-grid">
+      <rms-field label="Nombre completo" required span="full">
+        <input class="rms-input" formControlName="fullName" maxlength="150" aria-label="Nombre del cliente"
+          placeholder="Ej. Juan Pérez" autocomplete="name" />
+      </rms-field>
+
+      <rms-field label="Documento" optional hint="Cédula, pasaporte o licencia.">
+        <input class="rms-input" formControlName="documentNumber" maxlength="50" aria-label="Documento del cliente"
+          placeholder="Ej. 001-010190-0001A" />
+      </rms-field>
+
+      <rms-field label="Teléfono" optional>
+        <input class="rms-input" formControlName="phone" maxlength="50" aria-label="Teléfono del cliente"
+          placeholder="Ej. 8888 8888" autocomplete="tel" />
+      </rms-field>
+
+      <rms-field label="Correo" optional span="full">
+        <input class="rms-input" type="email" formControlName="email" maxlength="150" aria-label="Correo del cliente"
+          placeholder="Ej. cliente@correo.com" autocomplete="email" />
+      </rms-field>
+
+      <rms-field label="Notas" optional span="full">
+        <input class="rms-input" formControlName="notes" maxlength="300" aria-label="Notas del cliente"
+          placeholder="Ej. Prefiere habitación con garaje" />
+      </rms-field>
+    </div>
+
+    <p class="customers-form__hint">
+      La ficha se puede asociar a reservaciones y estancias. Desactivar un cliente conserva su historial y lo oculta
+      del listado por defecto.
+    </p>
+
+    <div class="customers-form__actions">
+      <button type="button" class="rms-btn rms-btn--ghost" [disabled]="store.saving()" (click)="closeForm()">Cancelar</button>
+      <button type="submit" class="rms-btn rms-btn--primary" [disabled]="store.saving() || !network.online()">
+        <rms-cazo-icon name="check" [size]="16" />
+        {{ store.saving() ? 'Guardando…' : (editingId() === null ? 'Crear cliente' : 'Guardar cambios') }}
+      </button>
+    </div>
+  </form>
+</rms-drawer>

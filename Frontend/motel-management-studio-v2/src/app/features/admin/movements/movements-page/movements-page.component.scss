@@ -1,0 +1,17 @@
+:host { display: block; }
+.movements-stack { display: grid; gap: 18px; }
+.movements-date { display: block; min-width: 168px; }
+.movements-cell { display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &--wrap { strong, small { overflow: visible; text-overflow: clip; white-space: normal; } }
+  &--num { text-align: right; strong { font-variant-numeric: tabular-nums; } strong.is-out { color: var(--cazo-danger); } }
+}
+.movements-detail {
+  display: grid; gap: 14px;
+  &__list { display: grid; gap: 12px; margin: 0;
+    div { display: grid; gap: 3px; }
+    dt { color: var(--cazo-muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+    dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere;
+      small { color: var(--cazo-muted); font-weight: 500; } } }
+}

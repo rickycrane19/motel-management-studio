@@ -1,0 +1,104 @@
+@if (loading()) {
+  <section class="rms-page stay-type-form-loading" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir la tarifa" [description]="message">
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="load()">Reintentar</button>
+      <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Volver a tarifas</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar tarifa' : 'Nueva tarifa'"
+    eyebrow="TARIFAS"
+    [subtitle]="isEdit ? 'Cambia lo que necesites; los cambios llegan a recepción al guardar.' : 'Define el tiempo que incluye y el precio que cobra recepción al hospedar o extender.'"
+    [backLink]="backLink" backLabel="Volver a tarifas"
+    [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside>
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes revisar la tarifa, pero necesitas conexión para guardarla.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="stay-type-form" novalidate>
+      <rms-panel title="Datos de la tarifa" subtitle="Así se verá en recepción al hospedar.">
+        <div class="rms-form-grid rms-form-grid--3">
+          <rms-field label="Nombre de la tarifa" required [error]="nameError()">
+            <input class="rms-input" formControlName="name" maxlength="100" autocomplete="off" placeholder="Ej. Rato 2 Horas" />
+          </rms-field>
+          <rms-field label="Tipo de cuarto" hint="Vacío aplica a todo el motel." [error]="null">
+            <rms-combobox formControlName="roomTypeId" [options]="roomTypes()" placeholder="Todo el motel" emptyText="No hay tipos de cuarto con ese nombre" ariaLabel="Tipo de cuarto" />
+          </rms-field>
+          <rms-field label="Duración" required [error]="durationError()" hint="En horas: 2, 3, 12…">
+            <input class="rms-input" formControlName="durationHours" type="number" inputmode="decimal" min="0.5" max="720" step="0.5" />
+          </rms-field>
+          <rms-field label="Precio" required [error]="priceError()" hint="Cobertura en córdobas.">
+            <input class="rms-input" formControlName="price" type="number" inputmode="decimal" min="0" step="0.01" />
+          </rms-field>
+          <rms-field label="Precio por hora" hint="Se calcula solo: precio ÷ horas.">
+            <output class="rms-input rms-input--readonly">{{ money(pricePerHour()) }}</output>
+          </rms-field>
+        </div>
+      </rms-panel>
+
+      <rms-panel title="Tipo de tarifa" subtitle="Las extensiones son para alargar una estancia ya iniciada.">
+        <div class="switch-list">
+          <label class="switch-card">
+            <input type="checkbox" class="rms-switch" formControlName="isExtension" />
+            <span>
+              <strong>Es tarifa de extensión</strong>
+              <small>Solo se ofrece para alargar estancias (hora extra, rato adicional…). Si lo dejas apagado, es una tarifa de permanencia.</small>
+            </span>
+          </label>
+        </div>
+      </rms-panel>
+
+      @if (isEdit) {
+        <rms-panel title="Disponibilidad" subtitle="Decide si la tarifa sigue ofreciéndose en recepción.">
+          <div class="switch-list">
+            <label class="switch-card">
+              <input type="checkbox" class="rms-switch" formControlName="isActive" />
+              <span>
+                <strong>Tarifa activa</strong>
+                <small>Si la apagas, deja de ofrecerse en recepción, pero no se borra del histórico.</small>
+              </span>
+            </label>
+          </div>
+        </rms-panel>
+      } @else {
+        <rms-notice tone="info" title="Las tarifas nuevas se crean activas">Si después necesitas retirarla, puedes desactivarla desde el listado sin borrarla.</rms-notice>
+      }
+    </form>
+
+    <aside aside class="stay-type-aside">
+      <rms-panel title="Vista previa" subtitle="Así la verá recepción." raised>
+        <article class="preview-card">
+          <div class="preview-card__top">
+            <span class="preview-card__icon" aria-hidden="true"><rms-cazo-icon name="clock" [size]="22" /></span>
+            <span class="preview-card__status" [class.is-off]="!isActiveValue()">{{ isActiveValue() ? 'Activa' : 'Desactivada' }}</span>
+          </div>
+          <div class="preview-card__body">
+            <h3>{{ nameValue().trim() || 'Nombre de la tarifa' }}</h3>
+            <p>{{ roomTypeName() }} · {{ isExtensionValue() ? 'Extensión' : 'Permanencia' }}</p>
+            <strong>{{ money(priceValue()) }}</strong>
+            <small>Incluye {{ durationLabel(durationValue()) || '—' }}</small>
+          </div>
+        </article>
+      </rms-panel>
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online()" (click)="save()">
+        {{ saving() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear tarifa' }}
+      </button>
+    </ng-container>
+  </rms-form-page>
+}

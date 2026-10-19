@@ -1,0 +1,57 @@
+<header class="header">
+  <div class="header__context">
+    @if (pageContext().group) { <span>{{ pageContext().group }}</span> }
+    <strong>{{ pageContext().label }}</strong>
+  </div>
+
+  <div class="header__actions">
+    <div class="global-search" role="search">
+      <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
+      <input #searchInput type="search" role="combobox" autocomplete="off" spellcheck="false"
+        placeholder="Ir a una pantalla…" aria-label="Ir a una pantalla"
+        aria-autocomplete="list" aria-controls="header-search-list" [attr.aria-expanded]="searchOpen()"
+        [attr.aria-activedescendant]="searchOpen() && options().length ? 'header-search-' + activeIndex() : null"
+        [value]="query()" (input)="onSearchInput($event)" (focus)="openSearch()" (keydown)="onSearchKeydown($event)" />
+      <kbd aria-hidden="true">Ctrl K</kbd>
+      @if (searchOpen()) {
+        <ul class="global-search__list" id="header-search-list" role="listbox" aria-label="Pantallas">
+          @if (!query().trim()) { <li class="global-search__label" role="presentation">Accesos rápidos</li> }
+          @for (option of options(); track option.key; let index = $index) {
+            <li role="option" class="global-search__option" [id]="'header-search-' + index" [class.is-active]="index === activeIndex()"
+              [attr.aria-selected]="index === activeIndex()" (mousedown)="$event.preventDefault()" (click)="go(option)" (mouseenter)="activeIndex.set(index)">
+              <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
+              <span><strong>{{ option.label }}</strong><small>{{ option.hint }}</small></span>
+              <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+            </li>
+          } @empty {
+            <li class="global-search__label" role="presentation">No encontramos esa pantalla. Prueba con otra palabra.</li>
+          }
+        </ul>
+      }
+    </div>
+
+    @if (canSwitchLocation()) {
+      <button class="scope" type="button" aria-label="Cambiar de sucursal">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <span class="scope__copy"><strong>{{ locationName() }}</strong><small>Cambiar sucursal</small></span>
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button>
+    } @else if (auth.session()?.user?.locationId) {
+      <div class="scope scope--readonly" [attr.aria-label]="'Sucursal: ' + locationName()">
+        <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <span class="scope__copy"><strong>{{ locationName() }}</strong></span>
+      </div>
+    }
+
+    <div class="profile">
+      <span class="profile__avatar" aria-hidden="true">{{ avatarInitials() }}</span>
+      <span class="profile__copy"><strong>{{ userName() }}</strong><small>{{ roleLabel() }}</small></span>
+      <button class="profile__logout" type="button" [disabled]="loggingOut()" (click)="logout()">
+        {{ loggingOut() ? 'Saliendo…' : 'Salir' }}
+      </button>
+    </div>
+  </div>
+</header>
+@if (logoutError()) {
+  <p class="header__logout-error" role="alert">{{ logoutError() }}</p>
+}

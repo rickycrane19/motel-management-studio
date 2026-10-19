@@ -1,0 +1,69 @@
+<section class="rms-page fine-types-page">
+  <rms-page-header
+    title="Tipos de multa"
+    eyebrow="MULTAS"
+    subtitle="Catálogo que recepción usa al aplicar una multa en la estancia: qué cubre cada tipo y su monto por defecto.">
+    @if (canManage()) {
+      <a actions class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Nuevo tipo de multa</a>
+    }
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-empty-state kind="forbidden" title="Sin permiso de tipos de multa" description="Tu rol no tiene acceso a este catálogo. Pídele a un administrador el permiso de tipos de multa." />
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes ver los tipos que ya cargaron. Para crear o cambiar tipos necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de tipos de multa">
+      <rms-stat-card label="Tipos de multa" [value]="store.stats().total" hint="En el catálogo" icon="alert" tone="brand" [loading]="store.status() === 'loading' && store.fineTypes().length === 0" />
+      <rms-stat-card label="Activos" [value]="store.stats().active" hint="Disponibles al aplicar multa" icon="check" [loading]="store.status() === 'loading' && store.fineTypes().length === 0" />
+      <rms-stat-card label="Desactivados" [value]="store.stats().inactive" hint="No se aplican por ahora" icon="eye-off" [loading]="store.status() === 'loading' && store.fineTypes().length === 0" />
+      <rms-stat-card [label]="'Monto promedio'" [value]="store.stats().averageAmount ? money(store.stats().averageAmount) : '—'" hint="De los tipos del catálogo" icon="cash" [loading]="store.status() === 'loading' && store.fineTypes().length === 0" />
+    </div>
+
+    <rms-filter-bar placeholder="Buscar tipo de multa por nombre o descripción…" [search]="store.query().name" [activeCount]="activeFilters()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <rms-combobox filters class="filter-status" [options]="statusOptions" [formControl]="statusControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+    </rms-filter-bar>
+
+    <rms-data-table
+      [columns]="columns()"
+      [rows]="store.fineTypes()"
+      [loading]="store.status() === 'loading'"
+      [error]="tableError()"
+      [trackBy]="trackFineType"
+      emptyTitle="Aún no tienes tipos de multa"
+      emptyDescription="Crea el primero para que recepción pueda registrar multas con monto por defecto."
+      caption="Tipos de multa del motel"
+      [rowClickable]="false">
+      <ng-template rmsCell="name" let-row>
+        <span class="cell-main"><strong>{{ row.name }}</strong></span>
+        <small>ID {{ row.fineTypeId }}</small>
+      </ng-template>
+      <ng-template rmsCell="description" let-row>
+        <span class="cell-sub">{{ row.description ?? 'Sin descripción' }}</span>
+      </ng-template>
+      <ng-template rmsCell="amount" let-row>
+        <span class="cell-price">{{ money(row.defaultAmount) }}</span>
+      </ng-template>
+      <ng-template rmsCell="createdOn" let-row>
+        <span class="cell-sub">{{ createdLabel(row) }}</span>
+      </ng-template>
+      <ng-template rmsCell="status" let-row>
+        <rms-status-badge [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Activo' : 'Desactivado' }}</rms-status-badge>
+      </ng-template>
+      <ng-template rmsCell="actions" let-row>
+        <div class="row-actions" (click)="$event.stopPropagation()">
+          @if (canManage()) {
+            <a class="rms-btn rms-btn--secondary rms-btn--sm" [routerLink]="[row.fineTypeId, 'editar']" [attr.aria-label]="'Editar ' + row.name"><rms-cazo-icon name="edit" [size]="15" /> Editar</a>
+            <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" [disabled]="!network.online() || store.busyFineTypeId() === row.fineTypeId" (click)="toggleStatus(row)" [attr.aria-label]="(row.isActive ? 'Desactivar ' : 'Activar ') + row.name">
+              <rms-cazo-icon [name]="row.isActive ? 'eye-off' : 'eye'" [size]="15" /> {{ row.isActive ? 'Desactivar' : 'Activar' }}
+            </button>
+          }
+        </div>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+        label="tipos de multa" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="setPageSize($event)" />
+    </rms-data-table>
+  }
+</section>

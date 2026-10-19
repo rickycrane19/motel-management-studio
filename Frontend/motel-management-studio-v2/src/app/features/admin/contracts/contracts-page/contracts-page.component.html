@@ -1,0 +1,76 @@
+<section class="rms-page hr-stack">
+  <rms-page-header eyebrow="RECURSOS HUMANOS" title="Contratos"
+    subtitle="Vigencia, modalidad y salario de cada empleado. El contrato alimenta la nómina mensual; los turnos extra se registran aparte y salen de la caja.">
+    @if (canManage()) {
+      <a actions class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!network.online()">
+        <rms-cazo-icon name="plus" [size]="18" /> Nuevo contrato
+      </a>
+    }
+  </rms-page-header>
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Puedes consultar los contratos cargados. Para crear o cambiar uno necesitas conexión.</rms-notice>
+  }
+
+  <div class="rms-stats" aria-label="Resumen de contratos">
+    <rms-stat-card label="Vigentes" [value]="store.stats().active" hint="Al día" icon="check" tone="brand" [loading]="isLoading()" />
+    <rms-stat-card label="Por vencer (30 días)" [value]="store.stats().expiring" hint="Renuévalos pronto" icon="clock" [loading]="isLoading()" />
+    <rms-stat-card label="Vencidos" [value]="store.stats().expired" hint="Siguen activos sin renovar" icon="alert" [loading]="isLoading()" />
+    <rms-stat-card label="Terminados" [value]="store.stats().ended" hint="Historial de pagos" icon="note" [loading]="isLoading()" />
+  </div>
+
+  <rms-filter-bar placeholder="Buscar por empleado, puesto u horario…" [search]="store.query().search" [activeCount]="store.activeFilterCount()"
+    (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+    <rms-combobox filters [options]="paymentTypeOptions" [formControl]="paymentTypeControl" placeholder="Todas las modalidades"
+      emptyText="No hay modalidades con ese nombre" ariaLabel="Filtrar por modalidad de pago" />
+    <rms-combobox filters [options]="statusOptions" [formControl]="statusControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+  </rms-filter-bar>
+
+  <rms-data-table [columns]="columns" [rows]="store.pageRows()" [loading]="isLoading()" [error]="store.errorMessage()"
+    errorTitle="No pudimos cargar los contratos" caption="Contratos laborales" [trackBy]="trackContract" (retry)="reload()"
+    [emptyTitle]="store.activeFilterCount() ? 'No encontramos contratos con esos filtros' : 'Todavía no hay contratos'"
+    [emptyDescription]="store.activeFilterCount() ? 'Prueba con otra palabra o limpia los filtros.' : 'Registra el primer contrato de tu equipo.'">
+    <ng-template rmsCell="person" let-row>
+      <span class="hr-cell hr-cell--wrap">
+        <strong>{{ row.employeeName }}</strong>
+        <small>{{ row.position }} · {{ row.scheduleNotes || 'Sin horario registrado' }}</small>
+      </span>
+    </ng-template>
+    <ng-template rmsCell="type" let-row>
+      <span class="hr-cell"><strong>{{ paymentLabel(row.paymentType) }}</strong><small>Monto {{ row.currencyCode }}</small></span>
+    </ng-template>
+    <ng-template rmsCell="term" let-row>
+      <span class="hr-cell hr-cell--wrap">
+        <strong>{{ row.startDate | date:'d MMM y':'UTC' }} al {{ row.endDate ? (row.endDate | date:'d MMM y':'UTC') : 'sin fin' }}</strong>
+        <small>{{ termHint(row) }}</small>
+      </span>
+    </ng-template>
+    <ng-template rmsCell="pay" let-row>
+      <span class="hr-cell" style="text-align: right">
+        <strong class="num">{{ row.currencyCode }} {{ row.baseAmount | number:'1.2-2' }}</strong>
+        <small>{{ row.paymentTypeName || paymentLabel(row.paymentType) }}</small>
+      </span>
+    </ng-template>
+    <ng-template rmsCell="status" let-row>
+      <rms-status-badge [tone]="statusTone(row)">{{ statusLabel(row) }}</rms-status-badge>
+    </ng-template>
+    <ng-template rmsCell="actions" let-row>
+      <div class="row-actions">
+        @if (canManage()) {
+          <a class="rms-btn rms-btn--ghost rms-btn--sm nowrap" [routerLink]="[row.contractId, 'editar']" [attr.aria-label]="'Editar contrato de ' + row.employeeName">
+            <rms-cazo-icon name="edit" [size]="14" /> Editar
+          </a>
+          <button type="button" class="rms-icon-btn" [disabled]="!network.online()"
+            (click)="row.isActive ? endContract(row) : reopenContract(row)"
+            [attr.aria-label]="(row.isActive ? 'Terminar contrato de ' : 'Reabrir contrato de ') + row.employeeName"
+            [title]="row.isActive ? 'Terminar contrato' : 'Reabrir contrato'">
+            <rms-cazo-icon [name]="row.isActive ? 'close' : 'refresh'" [size]="16" />
+          </button>
+        }
+      </div>
+    </ng-template>
+    <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="isLoading()"
+      label="contratos" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)"
+      (pageSizeChange)="store.patchFilters({ pageSize: $event })" />
+  </rms-data-table>
+</section>

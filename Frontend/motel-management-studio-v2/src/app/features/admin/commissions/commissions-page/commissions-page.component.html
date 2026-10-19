@@ -1,0 +1,145 @@
+<section class="rms-page hr-stack">
+  <rms-page-header eyebrow="RECURSOS HUMANOS" title="Comisiones"
+    subtitle="Reglas por empleado, puesto o para todo el equipo: tramos de venta, estancias, minibar o propinas. La regla más específica manda en el reporte de cajeros.">
+    @if (canManage()) {
+      <button actions type="button" class="rms-btn rms-btn--primary" [disabled]="!network.online()" (click)="openCreate()">
+        <rms-cazo-icon name="plus" [size]="18" /> Nueva regla
+      </button>
+    }
+  </rms-page-header>
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Puedes consultar las reglas cargadas. Para crear o cambiar una necesitas conexión.</rms-notice>
+  }
+
+  <rms-filter-bar placeholder="Buscar por nombre, empleado o puesto…" [search]="store.query().search" [activeCount]="store.activeFilterCount()"
+    (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+    <rms-combobox filters [options]="scopeOptions" [formControl]="scopeControl" placeholder="Todos los alcances"
+      emptyText="No hay alcances con ese nombre" ariaLabel="Filtrar por alcance" />
+    <rms-combobox filters [options]="metricOptions" [formControl]="metricControl" placeholder="Todas las métricas"
+      emptyText="No hay métricas con ese nombre" ariaLabel="Filtrar por métrica" />
+    <rms-combobox filters [options]="statusOptions" [formControl]="statusControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+  </rms-filter-bar>
+
+  <rms-data-table [columns]="columns" [rows]="store.rules()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()"
+    errorTitle="No pudimos cargar las reglas de comisión" caption="Reglas de comisión" [trackBy]="trackRule" (retry)="store.load()"
+    [emptyTitle]="store.activeFilterCount() ? 'No encontramos reglas con esos filtros' : 'Todavía no hay reglas de comisión'"
+    [emptyDescription]="store.activeFilterCount() ? 'Prueba con otra palabra o limpia los filtros.' : 'Crea la primera regla para que la nómina y el reporte de cajeros calculen comisiones por tramo.'">
+    <ng-template rmsCell="rule" let-row>
+      <span class="comm-cell">
+        <strong>{{ row.name }}</strong>
+        <small>{{ row.scopeTypeName }} · {{ row.targetLabel }}</small>
+      </span>
+    </ng-template>
+    <ng-template rmsCell="metric" let-row>
+      <span class="comm-cell"><strong>{{ row.metricTypeName || metricLabel(row.metricType) }}</strong><small>Métrica de la regla</small></span>
+    </ng-template>
+    <ng-template rmsCell="range" let-row>
+      <span class="comm-cell"><strong class="num">{{ rangeLabel(row) }}</strong><small>Tramo aplicable</small></span>
+    </ng-template>
+    <ng-template rmsCell="rate" let-row>
+      <strong class="num">{{ row.ratePercent | number:'1.0-2' }} %</strong>
+    </ng-template>
+    <ng-template rmsCell="validity" let-row>
+      <span class="comm-cell">
+        <strong>{{ row.startDate | date:'d MMM y':'UTC' }}@if (row.endDate) { al {{ row.endDate | date:'d MMM y':'UTC' }} }</strong>
+        <small>{{ row.endDate ? 'Con fecha de fin' : 'Vigencia indefinida' }}</small>
+      </span>
+    </ng-template>
+    <ng-template rmsCell="status" let-row>
+      <rms-status-badge [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Vigente' : 'Inactiva' }}</rms-status-badge>
+    </ng-template>
+    <ng-template rmsCell="actions" let-row>
+      <div class="row-actions">
+        @if (canManage()) {
+          <button type="button" class="rms-icon-btn" [disabled]="!network.online()" (click)="openEdit(row)"
+            [attr.aria-label]="'Editar la regla ' + row.name" title="Editar regla">
+            <rms-cazo-icon name="edit" [size]="16" />
+          </button>
+          <button type="button" class="rms-icon-btn" [disabled]="!network.online()" (click)="toggleActive(row)"
+            [attr.aria-label]="(row.isActive ? 'Desactivar la regla ' : 'Activar la regla ') + row.name"
+            [title]="row.isActive ? 'Desactivar regla' : 'Activar regla'">
+            <rms-cazo-icon [name]="row.isActive ? 'close' : 'refresh'" [size]="16" />
+          </button>
+        }
+      </div>
+    </ng-template>
+    <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()"
+      [loading]="store.status() === 'loading'" label="reglas" [pageSizeOptions]="pageSizes"
+      (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event })" />
+  </rms-data-table>
+</section>
+
+<rms-drawer [open]="drawerOpen()" [title]="editingId() === null ? 'Nueva regla de comisión' : 'Editar regla de comisión'"
+  subtitle="Alcance, métrica y tramo" eyebrow="Comisiones" (closed)="closeDrawer()">
+  <form [formGroup]="form" (ngSubmit)="save()" class="comm-form" novalidate>
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No pudimos guardar la regla">{{ message }}</rms-notice>
+    }
+
+    <div class="rms-form-grid">
+      <rms-field label="Nombre de la regla" required span="full">
+        <input class="rms-input" formControlName="name" maxlength="120" aria-label="Nombre de la regla"
+          placeholder="Ej. Comisión de ventas del turno noche" />
+      </rms-field>
+
+      <rms-field label="Alcance" required>
+        <rms-combobox formControlName="scopeType" [options]="scopeOptions" [clearable]="false" ariaLabel="Alcance de la regla" />
+      </rms-field>
+
+      @if (scopeValue() === 'Employee') {
+        <rms-field label="Empleado" required>
+          <rms-combobox formControlName="employeeId" [loader]="searchEmployees" [selectedOptions]="selectedEmployee()"
+            placeholder="Busca por nombre…" emptyText="No encontramos empleados con ese nombre" ariaLabel="Empleado de la regla" />
+        </rms-field>
+      } @else if (scopeValue() === 'Position') {
+        <rms-field label="Puesto" required hint="Se aplica a todos los empleados con ese puesto.">
+          <input class="rms-input" formControlName="position" maxlength="100" aria-label="Puesto de la regla" placeholder="Ej. Cajero" />
+        </rms-field>
+      } @else {
+        <rms-field label="Se aplica a" >
+          <input class="rms-input" value="Todo el equipo" disabled aria-label="Alcance general" />
+        </rms-field>
+      }
+
+      <rms-field label="Métrica" required>
+        <rms-combobox formControlName="metricType" [options]="metricOptions" [clearable]="false" ariaLabel="Métrica de la regla" />
+      </rms-field>
+
+      <rms-field label="Desde (monto)" required hint="Inicio del tramo, inclusive.">
+        <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="minAmount" aria-label="Monto mínimo del tramo" />
+      </rms-field>
+      <rms-field label="Hasta (monto)" optional hint="Fin del tramo, exclusivo. Vacío = sin tope.">
+        <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="maxAmount" aria-label="Monto máximo del tramo" />
+      </rms-field>
+
+      <rms-field label="Porcentaje" required hint="Comisión aplicada sobre el total de la métrica (0–100).">
+        <input class="rms-input" type="number" inputmode="decimal" min="0" max="100" step="0.01" formControlName="ratePercent" aria-label="Porcentaje de comisión" />
+      </rms-field>
+
+      <rms-field label="Vigente desde" required>
+        <rms-date-field formControlName="startDate" ariaLabel="Inicio de vigencia" />
+      </rms-field>
+      <rms-field label="Vigente hasta" optional>
+        <rms-date-field formControlName="endDate" ariaLabel="Fin de vigencia" />
+      </rms-field>
+
+      <rms-field label="Notas" optional span="full">
+        <input class="rms-input" formControlName="notes" maxlength="300" aria-label="Notas de la regla"
+          placeholder="Ej. Aplica solo al turno de noche; revisar cada trimestre" />
+      </rms-field>
+    </div>
+
+    <p class="comm-form__hint">
+      La regla más específica manda: empleado sobre puesto, y puesto sobre general. Si dos reglas del mismo alcance
+      cubren el mismo tramo, se aplica la del tramo que contenga el monto.
+    </p>
+
+    <div class="comm-form__actions">
+      <button type="button" class="rms-btn rms-btn--ghost" [disabled]="store.saving()" (click)="closeDrawer()">Cancelar</button>
+      <button type="submit" class="rms-btn rms-btn--primary" [disabled]="store.saving() || !network.online()">
+        @if (store.saving()) { <span class="rms-spinner"></span> Guardando… } @else { <rms-cazo-icon name="check" [size]="16" /> Guardar regla }
+      </button>
+    </div>
+  </form>
+</rms-drawer>

@@ -1,0 +1,24 @@
+:host { display: block; }
+.purchases-stack { display: grid; gap: 18px; }
+.purchases-date { display: block; min-width: 168px; }
+.purchases-cell { display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &--wrap { strong, small { overflow: visible; text-overflow: clip; white-space: normal; } }
+  &--num { text-align: right; strong { font-variant-numeric: tabular-nums; } }
+}
+.purchases-doc-id { margin-left: 4px; }
+.purchases-nocash { color: var(--cazo-muted); font-weight: 600; }
+.purchases-detail {
+  display: grid; gap: 14px;
+  &__list { display: grid; gap: 12px; margin: 0;
+    div { display: grid; gap: 3px; }
+    dt { color: var(--cazo-muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+    dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; } }
+  &__subtitle { margin: 6px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--cazo-muted); text-transform: uppercase; }
+  &__items { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px;
+    li { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-top: 1px solid var(--cazo-line); padding-top: 10px;
+      span { display: grid; gap: 2px; }
+      strong { font-size: 14px; font-weight: 650; }
+      small { color: var(--cazo-muted); font-size: 12px; } } }
+}

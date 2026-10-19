@@ -1,0 +1,65 @@
+:host { display: block; }
+.cashier-stack { display: grid; gap: 18px; }
+
+// Rango aplicado en el encabezado (zona del negocio y moneda base).
+.cashier-range { color: var(--cazo-muted); font-size: 12px; }
+
+// Rangos rápidos + fechas (America/Managua) + selector de usuario dentro de la barra de filtros.
+.cashier-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.cashier-quick__range {
+  border: 1px solid var(--cazo-line-strong);
+  background: var(--cazo-surface);
+  color: var(--cazo-ink);
+  &:hover { border-color: var(--cazo-brand); color: var(--cazo-brand-strong); background: var(--cazo-soft); }
+  &.is-active { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); color: var(--cazo-brand-strong); }
+}
+.cashier-date { display: block; min-width: 168px; }
+.cashier-note { margin: 0; color: var(--cazo-muted); font-size: 12px; }
+
+// Contenedor imprimible: conserva el ritmo vertical de la página.
+.cashier-print { display: grid; gap: 18px; }
+
+// Celdas de la tabla por cajero.
+.cashier-cell {
+  display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.cashier-cell--num { justify-items: end; }
+.cashier-amount { font-variant-numeric: tabular-nums; }
+.cashier-amount.is-income { color: var(--cazo-success); }
+.cashier-amount.is-expense { color: var(--cazo-danger); }
+
+// Detalle del panel lateral.
+.cashier-detail { display: grid; gap: 16px; }
+.cashier-detail__head {
+  display: grid; gap: 4px; padding: 16px; border-radius: var(--cazo-radius-lg);
+  background: var(--cazo-surface-raised); border: 1px solid var(--cazo-line-strong);
+  small { color: var(--cazo-muted); font-size: 12px; }
+  strong { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  span { color: var(--cazo-muted); font-size: 12px; }
+}
+.cashier-detail__list {
+  display: grid; gap: 2px; margin: 0;
+  > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cazo-line); }
+  dt { color: var(--cazo-muted); }
+  dd { margin: 0; text-align: end; font-weight: 600; font-variant-numeric: tabular-nums; }
+  dd.is-income { color: var(--cazo-success); }
+  dd.is-expense { color: var(--cazo-danger); }
+}
+.cashier-detail__note { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .cashier-quick { width: 100%; }
+  .cashier-date { flex: 1 1 150px; min-width: 0; }
+}
+
+// Deja que las celdas envuelvan en papel: en pantalla recortan con puntos suspensivos.
+@media print {
+  .cashier-cell strong,
+  .cashier-cell small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}

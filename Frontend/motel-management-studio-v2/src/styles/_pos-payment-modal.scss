@@ -1,0 +1,29 @@
+rms-pos-payment-modal {
+  .method-state {
+    min-height: 78px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px;
+    border: 1px dashed rgb(194 83 57 / 30%);
+    border-radius: 14px;
+    color: var(--cazo-muted);
+    font-size: 10px;
+  }
+
+  .method-state--error { color: #8e3020; background: rgb(194 83 57 / 5%); }
+  .method-spinner { width: 15px; height: 15px; border: 2px solid rgb(194 83 57 / 22%); border-top-color: var(--cazo-brand); border-radius: 50%; animation: pos-payment-spin 700ms linear infinite; }
+  .method-reference > span { width: 100%; }
+  .method-reference label { display: grid; gap: 6px; margin-top: 8px; color: var(--cazo-ink); font-size: 9px; }
+  .method-reference label span { display: flex; gap: 6px; }
+  .method-reference label em { color: var(--cazo-muted); font-style: normal; }
+  .method-reference input { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid rgb(194 83 57 / 25%); border-radius: 11px; color: var(--cazo-ink); background: transparent; outline: 0; }
+  .method-reference input:focus { border-color: var(--cazo-brand); box-shadow: 0 0 0 3px rgb(194 83 57 / 10%); }
+}
+
+@keyframes pos-payment-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  rms-pos-payment-modal .method-spinner { animation: none; }
+}

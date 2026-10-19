@@ -1,0 +1,104 @@
+<section class="rms-page rooms-page">
+  <rms-page-header title="Habitaciones" subtitle="La planta de tu motel: cada habitación con su tipo, piso y estado al día.">
+    @if (canCreate()) {
+      <a actions class="rms-btn rms-btn--primary" routerLink="nueva" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Nueva habitación</a>
+    }
+  </rms-page-header>
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Puedes ver la planta que ya cargó. Para crear o cambiar habitaciones necesitas conexión.</rms-notice>
+  }
+
+  <div class="rms-stats" aria-label="Resumen de la planta">
+    <rms-stat-card label="Habitaciones" [value]="store.stats().active" hint="Habilitadas en tu motel" icon="bed" tone="brand" [loading]="store.status() === 'loading' && store.rooms().length === 0" />
+    <rms-stat-card label="Disponibles" [value]="store.stats().available" hint="Listas para quien llegue" icon="check" [loading]="store.status() === 'loading' && store.rooms().length === 0" />
+    <rms-stat-card label="Ocupadas" [value]="store.stats().occupied" hint="Con estancia activa ahora" icon="users" [tone]="store.stats().occupied ? 'warning' : 'soft'" [loading]="store.status() === 'loading' && store.rooms().length === 0" />
+    <rms-stat-card label="Deshabilitadas" [value]="store.stats().inactive" hint="Guardadas, sin mostrarse" icon="eye-off" [tone]="store.stats().inactive ? 'warning' : 'soft'" [loading]="store.status() === 'loading' && store.rooms().length === 0" />
+  </div>
+
+  <rms-filter-bar placeholder="Buscar habitación por número, tipo o nota…" [search]="store.query().search" [activeCount]="activeFilters()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+    <rms-combobox filters class="filter-type" [options]="roomTypes()" [formControl]="typeControl" placeholder="Todos los tipos" emptyText="No hay tipos con ese nombre" ariaLabel="Filtrar por tipo de habitación" />
+    <rms-combobox filters class="filter-floor" [options]="floors()" [formControl]="floorControl" placeholder="Todos los pisos" emptyText="No hay ese piso" ariaLabel="Filtrar por piso" />
+    <rms-combobox filters class="filter-physical" [options]="physicalOptions" [formControl]="physicalControl" [clearable]="false" ariaLabel="Filtrar por estado físico" />
+    <rms-combobox filters class="filter-activity" [options]="activityOptions" [formControl]="activityControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+    <button actions type="button" class="rms-btn rms-btn--secondary" (click)="exportCurrentPage()" [disabled]="store.rooms().length === 0">
+      <rms-cazo-icon name="download" [size]="17" /> Exportar página
+    </button>
+  </rms-filter-bar>
+
+  <rms-data-table [columns]="columns" [rows]="store.rooms()" [loading]="store.status() === 'loading'" [error]="tableError()"
+    errorTitle="No pudimos cargar tu planta" caption="Directorio de habitaciones" [trackBy]="trackRoom" [rowClickable]="true"
+    (retry)="store.load()" (rowClick)="open($event)"
+    [emptyKind]="activeFilters() > 0 || store.query().search ? 'search' : 'empty'"
+    [emptyTitle]="activeFilters() > 0 || store.query().search ? 'No encontramos habitaciones con esos filtros' : 'Aún no tienes habitaciones'"
+    [emptyDescription]="activeFilters() > 0 || store.query().search ? 'Prueba con otra palabra o limpia los filtros.' : 'Crea la primera para empezar a recepcionar a tus huéspedes.'">
+    <ng-template rmsCell="room" let-room>
+      <div class="room-person">
+        <span class="room-avatar" [class.is-off]="!room.isActive" aria-hidden="true"><rms-cazo-icon name="bed" [size]="19" /></span>
+        <span class="room-cell"><strong>{{ room.roomNumber }}</strong><small>{{ equipment(room) || 'Habitación del motel' }}</small></span>
+      </div>
+    </ng-template>
+    <ng-template rmsCell="type" let-room>
+      <span class="room-cell">
+        <strong>{{ room.roomTypeName }}</strong>
+        <small>{{ floorLabel(room) }} · hasta {{ room.capacity }} {{ room.capacity === 1 ? 'persona' : 'personas' }}</small>
+      </span>
+    </ng-template>
+    <ng-template rmsCell="status" let-room>
+      <span class="room-cell">
+        <rms-status-badge [tone]="statusTone(room)">
+          <rms-cazo-icon [name]="statusIcon(room)" [size]="13" /> {{ statusName(room) }}
+        </rms-status-badge>
+        @if (room.currentRoomStayId) { <small>Estancia en curso</small> }
+      </span>
+    </ng-template>
+    <ng-template rmsCell="activity" let-room>
+      <rms-status-badge [tone]="room.isActive ? 'success' : 'neutral'">{{ room.isActive ? 'Habilitada' : 'Deshabilitada' }}</rms-status-badge>
+    </ng-template>
+    <ng-template rmsCell="actions" let-room>
+      <div class="row-actions" (click)="$event.stopPropagation()">
+        <a class="rms-btn rms-btn--primary rms-btn--sm" [routerLink]="[room.roomId, 'editar']" [attr.aria-label]="'Editar la habitación ' + room.roomNumber">
+          Editar <rms-cazo-icon name="chevron-right" [size]="15" />
+        </a>
+      </div>
+    </ng-template>
+    <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+      label="habitaciones" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="setPageSize($event)" />
+  </rms-data-table>
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="'Habitación ' + (selected()?.roomNumber ?? '')" [subtitle]="selected()?.roomTypeName ?? null" eyebrow="Detalle de la habitación" (closed)="closeDetail()">
+  @if (selected(); as room) {
+    <ng-container>
+      <div class="detail">
+        <div class="detail__hero" [class.is-off]="!room.isActive">
+          <rms-cazo-icon name="bed" [size]="30" />
+          <strong>{{ room.roomNumber }}</strong>
+          <span>{{ floorLabel(room) }}</span>
+        </div>
+        <div class="detail__badges">
+          <rms-status-badge [tone]="room.isActive ? 'success' : 'neutral'">{{ room.isActive ? 'Habilitada' : 'Deshabilitada' }}</rms-status-badge>
+          <rms-status-badge [tone]="statusTone(room)" [dot]="false">
+            <rms-cazo-icon [name]="statusIcon(room)" [size]="13" /> {{ statusName(room) }}
+          </rms-status-badge>
+        </div>
+        @if (room.notes) { <p class="detail__description">{{ room.notes }}</p> }
+        <dl class="detail__list">
+          <div><dt>Tipo</dt><dd>{{ room.roomTypeName }}</dd></div>
+          <div><dt>Capacidad</dt><dd>{{ room.capacity }} {{ room.capacity === 1 ? 'persona' : 'personas' }}</dd></div>
+          <div><dt>Piso</dt><dd>{{ floorLabel(room) }}</dd></div>
+          <div><dt>Cochera</dt><dd>{{ room.hasGarage ? 'Incluida' : 'No incluye' }}</dd></div>
+          <div><dt>Jacuzzi</dt><dd>{{ room.hasJacuzzi ? 'Incluido' : 'No incluye' }}</dd></div>
+        </dl>
+      </div>
+      <div footer class="drawer-actions">
+        @if (canUpdate()) {
+          <a class="rms-btn rms-btn--primary drawer-actions__wide" [routerLink]="[room.roomId, 'editar']" (click)="closeDetail()"><rms-cazo-icon name="edit" [size]="16" /> Editar</a>
+          <button type="button" class="rms-btn rms-btn--secondary" [disabled]="!network.online() || store.busyRoomId() === room.roomId" (click)="toggleStatus(room)">
+            <rms-cazo-icon [name]="room.isActive ? 'eye-off' : 'eye'" [size]="16" /> {{ room.isActive ? 'Deshabilitar' : 'Rehabilitar' }}
+          </button>
+        }
+      </div>
+    </ng-container>
+  }
+</rms-drawer>

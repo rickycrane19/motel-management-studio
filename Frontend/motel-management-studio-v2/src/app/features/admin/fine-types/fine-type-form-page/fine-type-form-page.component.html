@@ -1,0 +1,86 @@
+@if (loading()) {
+  <section class="rms-page fine-type-form-loading" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir el tipo de multa" [description]="message">
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="load()">Reintentar</button>
+      <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Volver a tipos de multa</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar tipo de multa' : 'Nuevo tipo de multa'"
+    eyebrow="MULTAS"
+    [subtitle]="isEdit ? 'Cambia lo que necesites; los cambios se usan al aplicar la siguiente multa.' : 'Describe lo que cubre y el monto que se sugiere al aplicar la multa.'"
+    [backLink]="backLink" backLabel="Volver a tipos de multa"
+    [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside>
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes revisar el tipo de multa, pero necesitas conexión para guardarlo.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="fine-type-form" novalidate>
+      <rms-panel title="Datos del tipo de multa" subtitle="Así lo verá recepción al registrar la multa en la estancia.">
+        <div class="rms-form-grid">
+          <rms-field label="Nombre" required [error]="nameError()" span="full" hint="Ej. Daño a lencería / sábanas.">
+            <input class="rms-input" formControlName="name" maxlength="120" autocomplete="off" placeholder="Ej. Daño a lencería / sábanas" />
+          </rms-field>
+          <rms-field label="Monto por defecto" required [error]="amountError()" hint="Se sugiere al aplicar la multa; recepción puede ajustarlo.">
+            <input class="rms-input" formControlName="defaultAmount" type="number" inputmode="decimal" min="0" step="0.01" />
+          </rms-field>
+          <rms-field label="Qué cubre" [error]="descriptionError()" hint="Una frase corta para que el equipo no lo dude.">
+            <textarea class="rms-input" formControlName="description" rows="3" maxlength="300" placeholder="Ej. Manchas o roturas en sábanas, cobertores o toallas."></textarea>
+          </rms-field>
+        </div>
+      </rms-panel>
+
+      @if (isEdit) {
+        <rms-panel title="Disponibilidad" subtitle="Decide si el tipo sigue ofreciéndose al aplicar multas.">
+          <div class="switch-list">
+            <label class="switch-card">
+              <input type="checkbox" class="rms-switch" formControlName="isActive" />
+              <span>
+                <strong>Tipo de multa activo</strong>
+                <small>Si lo apagas, deja de ofrecerse al registrar multas, pero las multas ya aplicadas no cambian y no se borra del histórico.</small>
+              </span>
+            </label>
+          </div>
+        </rms-panel>
+      } @else {
+        <rms-notice tone="info" title="Los tipos nuevos se crean activos">Si después necesitas retirarlo, puedes desactivarlo desde el listado sin borrarlo.</rms-notice>
+      }
+    </form>
+
+    <aside aside class="fine-type-aside">
+      <rms-panel title="Vista previa" subtitle="Así lo verá recepción." raised>
+        <article class="preview-card">
+          <div class="preview-card__top">
+            <span class="preview-card__icon" aria-hidden="true"><rms-cazo-icon name="alert" [size]="22" /></span>
+            <span class="preview-card__status" [class.is-off]="!isActiveValue()">{{ isActiveValue() ? 'Activo' : 'Desactivado' }}</span>
+          </div>
+          <div class="preview-card__body">
+            <h3>{{ nameValue().trim() || 'Nombre del tipo de multa' }}</h3>
+            <p>{{ descriptionValue().trim() || 'La descripción aparecerá aquí.' }}</p>
+            <strong>{{ money(amountValue()) }}</strong>
+            <small>Monto sugerido al aplicar la multa</small>
+          </div>
+        </article>
+      </rms-panel>
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online()" (click)="save()">
+        {{ saving() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear tipo de multa' }}
+      </button>
+    </ng-container>
+  </rms-form-page>
+}

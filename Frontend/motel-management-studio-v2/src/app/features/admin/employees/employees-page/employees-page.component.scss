@@ -1,0 +1,72 @@
+// Estilos portados del HR de restaurant v2 (features/hr/hr.scss), usados por la lista y la ficha.
+:host { display: block; }
+.hr-stack { display: grid; gap: 18px; }
+.hr-cell { display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    rms-cazo-icon { vertical-align: -2px; color: var(--cazo-muted); } }
+}
+.hr-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.hr-avatar {
+  width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 14px;
+  color: var(--cazo-brand-strong); background: var(--cazo-brand-soft); font: 700 14px/1 var(--cazo-font-display); letter-spacing: .02em;
+  &.is-off { color: var(--cazo-muted); background: var(--cazo-surface-sunken); }
+}
+.num { font-variant-numeric: tabular-nums; font-family: var(--cazo-font-display); }
+
+.hr-detail { display: grid; gap: 20px;
+  &__pay { display: grid; gap: 14px; }
+  &__pay-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    h3 { margin: 0; font: 650 17px/1.2 var(--cazo-font-display); letter-spacing: -.01em; } } }
+
+dl.hr-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 22px; margin: 0;
+  div { display: grid; gap: 3px; min-width: 0; }
+  dt { color: var(--cazo-muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+  dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; } }
+
+.hr-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none;
+  li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--cazo-line); border-radius: var(--cazo-radius-md); background: var(--cazo-surface);
+    > span { display: grid; gap: 2px; min-width: 0; }
+    small { color: var(--cazo-muted); font-size: 12px; }
+    &__when { flex: 0 0 auto; text-align: right; } } }
+
+.hr-inline-form { display: grid; gap: 14px; padding: 16px; border: 1px dashed var(--cazo-line-strong); border-radius: var(--cazo-radius-md); background: var(--cazo-surface-raised); }
+.hr-inline-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.hr-inline-total { margin: 0; color: var(--cazo-ink-soft); font-size: 13px; }
+.hr-inline-total strong { color: var(--cazo-ink); }
+
+// Tarjetas de modalidad del pago (mismo patrón hr-choice del formulario de contratos).
+.hr-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;
+  button { display: grid; gap: 4px; padding: 14px; border: 1.5px solid var(--cazo-line-strong); border-radius: var(--cazo-radius-md); background: var(--cazo-surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
+    transition: border-color .15s var(--cazo-ease), background-color .15s var(--cazo-ease);
+    strong { font-size: 14px; } small { color: var(--cazo-muted); font-size: 12px; line-height: 1.4; }
+    &:hover { border-color: var(--cazo-brand); } &.is-selected { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); } &:focus-visible { outline: 0; box-shadow: var(--cazo-focus-ring); } }
+}
+
+// Interruptor de «pagar desde la caja del turno» (patrón switch-card del resto del admin).
+.switch-list { display: grid; gap: 10px; }
+.switch-card {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px;
+  padding: 14px 16px; border: 1px solid var(--cazo-line); border-radius: var(--cazo-radius-md); cursor: pointer;
+  transition: border-color .15s var(--cazo-ease), background-color .15s var(--cazo-ease);
+}
+.switch-card:hover { border-color: var(--cazo-line-strong); background: var(--cazo-soft); }
+.switch-card:has(input:checked) { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); }
+.switch-card span { display: grid; gap: 2px; }
+.switch-card small { color: var(--cazo-muted); font-size: 13px; line-height: 1.4; }
+.switch-card.is-off { cursor: not-allowed; background: var(--cazo-surface-sunken); }
+.switch-card.is-off:hover { border-color: var(--cazo-line); background: var(--cazo-surface-sunken); }
+
+// Deducciones detalladas del pago (INSS, IR, préstamo, adelanto u otra).
+.hr-deductions { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--cazo-line); border-radius: var(--cazo-radius-md); background: var(--cazo-surface);
+  &__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  &__title { font-size: 13px; font-weight: 700; color: var(--cazo-ink);
+    small { display: block; color: var(--cazo-muted); font-size: 12px; font-weight: 500; } }
+  &__total { margin: 0; color: var(--cazo-ink-soft); font-size: 13px; text-align: right; } }
+.hr-deduction-row { display: grid; grid-template-columns: minmax(140px, .9fr) minmax(0, 1.4fr) minmax(110px, .7fr) auto; align-items: center; gap: 8px; }
+@media (max-width: 640px) { .hr-deduction-row { grid-template-columns: 1fr 1fr; } }
+
+.nowrap { white-space: nowrap; }
+
+.drawer-actions { display: flex; gap: 10px; justify-content: flex-end;
+  &__wide { flex: 1 1 auto; justify-content: center; } }

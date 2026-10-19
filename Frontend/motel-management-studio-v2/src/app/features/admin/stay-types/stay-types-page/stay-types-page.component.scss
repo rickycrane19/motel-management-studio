@@ -1,0 +1,19 @@
+:host { display: block; }
+.stay-types-page { display: grid; gap: 16px; }
+.rms-btn.is-disabled { pointer-events: none; opacity: .55; }
+.filter-kind { min-width: 230px; }
+.filter-status { min-width: 200px; }
+.cell-sub { display: block; max-width: 100%; overflow: hidden; color: var(--cazo-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.cell-main { display: block; font-size: 14px; }
+.cell-price { display: block; font-variant-numeric: tabular-nums; font-size: 14px; }
+.cell-duration { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; font-size: 14px; }
+.cell-duration rms-cazo-icon { color: var(--cazo-brand); }
+.row-actions { display: inline-flex; align-items: center; gap: 6px; }
+.detail { display: grid; gap: 14px; }
+.detail__badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail__list { display: grid; gap: 10px; margin: 0; padding: 14px 16px; border-radius: var(--cazo-radius-md); background: var(--cazo-surface-raised); }
+.detail__list div { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; }
+.detail__list dt { color: var(--cazo-muted); }
+.detail__list dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.drawer-actions .rms-btn { justify-content: center; }

@@ -1,0 +1,8 @@
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'MotelMSDB')
+BEGIN
+    CREATE DATABASE [MotelMSDB] COLLATE Latin1_General_100_CI_AI_SC_UTF8;
+END
+GO
+
+USE [MotelMSDB];
+GO

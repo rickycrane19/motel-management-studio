@@ -1,0 +1,198 @@
+<section class="cashbox-page">
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">ADMINISTRACIÓN / OPERACIÓN DE CAJA</span>
+      <h1>Monitor de cajas</h1>
+      <p>Opera las cajas de tu sucursal y conserva el contexto de cada turno.</p>
+    </div>
+    <div class="heading-actions">
+      <span class="scope-chip"><rms-cazo-icon name="store" [size]="14" />Sucursal autorizada</span>
+      <button class="secondary-button" type="button" (click)="load()" [disabled]="loading()">
+        <rms-cazo-icon name="swap" [size]="16" />Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (!canView()) {
+    <div class="notice notice--error" role="alert">
+      <strong>Sin permiso de caja</strong>
+      <span>Tu usuario necesita finance:view-cashbox para consultar esta sucursal.</span>
+    </div>
+  }
+
+  @if (canView()) {
+    @if (!network.online()) {
+      <div class="notice notice--warning" role="status"><strong>Sin conexión</strong><span>Las operaciones están deshabilitadas hasta recuperar la red.</span></div>
+    }
+    @if (successMessage(); as message) {
+      <div class="notice notice--success" role="status"><strong>Listo</strong><span>{{ message }}</span><button type="button" (click)="dismissMessages()" aria-label="Cerrar mensaje">×</button></div>
+    }
+    @if (errorMessage(); as message) {
+      <div class="notice notice--error" role="alert"><strong>No se completó</strong><span>{{ message }}</span><button type="button" (click)="dismissMessages()" aria-label="Cerrar error">×</button></div>
+    }
+    @if (reconciliationMessage(); as message) {
+      <div class="notice notice--warning" role="alert"><strong>Confirma el resultado del cierre</strong><span>{{ message }}</span><button type="button" (click)="reconcile()" [disabled]="loading()">{{ loading() ? 'Verificando…' : 'Verificar ahora' }}</button></div>
+    }
+
+    <div class="monitor-layout">
+      <aside class="cashbox-list" aria-label="Cajas de la sucursal">
+        <header class="list-heading"><div><h2>Cajas de la sucursal</h2><p>{{ rows().length }} disponibles para operar</p></div></header>
+        @if (loading()) {
+          <div class="state state--compact" role="status"><span class="spinner"></span><span>Cargando cajas…</span></div>
+        } @else if (!rows().length) {
+          <div class="state state--compact"><strong>No hay cajas disponibles</strong><p>El monitor aparecerá cuando el sistema registre las cajas de esta sucursal.</p></div>
+        } @else {
+          <div class="cashbox-list__items">
+            @for (row of rows(); track row.cashBoxId) {
+              <button class="cashbox-choice" type="button" [class.is-selected]="selectedCashBoxId() === row.cashBoxId" [class.cashbox-choice--open]="row.isOpen" [attr.aria-pressed]="selectedCashBoxId() === row.cashBoxId" (click)="selectCashBox(row)">
+                <span class="cashbox-choice__top"><strong>{{ row.name }}</strong><span class="status" [class.status--open]="row.isOpen">{{ statusLabel(row) }}</span></span>
+                <small>{{ row.code || 'Caja sin código' }}{{ row.isActive ? '' : ' · Inactiva' }}</small>
+                @if (row.sessionId) { <small>Sesión #{{ row.sessionId }} · {{ row.shiftName || 'Turno' }} · {{ row.userName || 'Operador' }}</small> }
+              </button>
+            }
+          </div>
+          <footer class="list-footer">{{ rows().length }} cajas · Sucursal autorizada</footer>
+        }
+      </aside>
+
+      @if (selectedCashBox(); as row) {
+        <section class="monitor-detail" aria-label="Detalle de caja seleccionada">
+          @if (pendingCashBox()) {
+            @if (pendingAction(); as action) {
+            <section class="operation-workspace">
+              <header class="operation-heading">
+                <div><button class="back-link" type="button" (click)="cancelAction()"><rms-cazo-icon name="arrow-left" [size]="15" /> Volver a {{ row.name }}</button><h2>{{ actionTitle() }}</h2><p>{{ actionDescription() }}</p></div>
+                <span class="status" [class.status--open]="row.isOpen">{{ statusLabel(row) }}</span>
+              </header>
+              <div class="session-context"><strong>{{ row.name }}</strong><span>{{ row.sessionId ? 'Sesión #' + row.sessionId : 'Nuevo turno' }}</span><span>{{ row.shiftName || 'Turno general' }}</span><span>{{ row.code || 'Caja sin código' }} · Moneda base {{ primaryCurrency() }}</span></div>
+              @if (errorMessage(); as message) { <div class="notice notice--error" role="alert">{{ message }}</div> }
+
+              @if (isCountAction()) {
+                <section class="count-workspace" aria-label="Conteo de efectivo">
+                  <section class="exchange-rate-panel" aria-label="Tasas de cambio del día">
+                    <header><div><strong>Tasas de cambio para la sesión</strong><p>Moneda base: {{ primaryCurrency() }} · Fecha de sucursal {{ operationalDate() }}</p></div><span class="status" [class.status--open]="missingExchangeRateCodes().length === 0" [class.status--pre-count]="missingExchangeRateCodes().length > 0">{{ missingExchangeRateCodes().length ? 'Requiere captura' : 'Tasas verificadas' }}</span></header>
+                    @if (secondaryCurrencyCodes().length) {
+                      <div class="exchange-rate-list">
+                        @for (code of secondaryCurrencyCodes(); track code) {
+                          <article class="exchange-rate-row">
+                            <div class="exchange-rate-row__pair"><strong>{{ code }} <rms-cazo-icon name="arrow-right" [size]="12" /> {{ primaryCurrency() }}</strong><small>1 {{ code }} en moneda base</small></div>
+                            @if (exchangeRateFor(code); as rate) {
+                              <div class="exchange-rate-row__value"><strong>1 {{ code }} = {{ rate | number:'1.4-8' }} {{ primaryCurrency() }}</strong><small>Tipo de cambio vigente del catálogo de denominaciones · {{ operationalDate() }}</small></div>
+                              <span class="rate-state rate-state--ready">Vigente</span>
+                            } @else {
+                              <div class="exchange-rate-row__value"><strong class="history-rate-missing">Tasa no registrada</strong><small>Solicita a administración cargar el tipo de cambio vigente.</small></div>
+                              <span class="rate-state rate-state--missing">Falta tasa</span>
+                            }
+                          </article>
+                        }
+                      </div>
+                    } @else {
+                      <p class="exchange-rate-empty">Esta sucursal opera únicamente en {{ primaryCurrency() }}; no requiere conversión.</p>
+                    }
+                    <footer class="exchange-rate-total"><span>Equivalente del conteo en {{ primaryCurrency() }}</span>@if (missingExchangeRateCodes().length === 0) { <strong>{{ totalCountInBase() | number:'1.2-2' }} {{ primaryCurrency() }}</strong> } @else { <strong class="exchange-rate-total__pending">Sin tasa no se puede convertir el conteo</strong> }</footer>
+                  </section>
+                  <div class="count-workspace__heading"><div><h3>{{ action === 'open' ? 'Fondo inicial' : action === 'pre-count' ? 'Conteo durante el turno' : closeReview() ? 'Conteo listo para confirmar' : 'Conteo final' }}</h3><p>Cuenta por denominación. Las monedas conservan sus propios subtotales.</p></div><div class="totals-row">@for (total of countedTotals(); track total.currencyCode) { <span><small>{{ total.currencyCode }}</small><strong>{{ total.amount | number:'1.2-2' }}</strong></span> }</div></div>
+                  @if (!countRows().length) { <div class="notice notice--warning" role="status"><strong>Denominaciones no configuradas</strong><span>No se puede operar caja sin un conteo válido. Solicita a administración cargar el catálogo de denominaciones.</span></div> }
+                  @if (countRows().length) { <div class="denomination-table">
+                    <div class="denomination-table__head"><span>Denominación</span><span>Moneda</span><span>Cantidad</span><span>Subtotal</span></div>
+                    @for (denomination of countRows(); track denomination.denominationId) {
+                      <label class="denomination-row"><span><strong>{{ denomination.label }}</strong><small>{{ denomination.value | number:'1.2-2' }} {{ denomination.currencyCode }}</small></span><span class="currency-code">{{ denomination.currencyCode }}</span><input [attr.aria-label]="'Cantidad de ' + denomination.label" type="number" min="0" max="1000000" step="1" inputmode="numeric" [value]="counts()[denomination.denominationId] ?? 0" (input)="setCount(denomination.denominationId, $event)" [readonly]="closeReview()" [disabled]="!network.online()" /><strong class="denomination-subtotal">{{ denomination.value * (counts()[denomination.denominationId] ?? 0) | number:'1.2-2' }}</strong></label>
+                    }
+                  </div> }
+                  @if (countRows().length && countIsZero()) { <label class="zero-confirm"><input type="checkbox" [checked]="zeroCountConfirmed()" (change)="confirmZeroCount($event)" [disabled]="closeReview()" />Confirmo que el conteo físico es cero en todas las monedas.</label> }
+                  @if (action === 'open') { <label class="field"><span>Turno · opcional</span><input type="text" maxlength="80" [value]="shiftName()" (input)="setShiftName($event)" placeholder="Matutino / Vespertino / Nocturno" [disabled]="!network.online()" /><small>Se guarda con la sesión; si lo dejas vacío queda «Turno general».</small></label> }
+                  @if (action === 'open' || action === 'close') { <label class="field"><span>Observaciones · opcional</span><textarea rows="3" maxlength="255" [value]="notes()" (input)="setNotes($event)" [readonly]="closeReview()" placeholder="Deja una nota para el siguiente responsable"></textarea><small>Hasta 255 caracteres.</small></label> }
+                  @if (closeReview()) { <div class="notice notice--warning" role="status">Al confirmar, la sesión dejará de aceptar movimientos y el backend calculará esperado, diferencia y arqueo. Si la respuesta tarda, verifica el estado antes de volver a intentarlo.</div> }
+                </section>
+              }
+
+              @if (action === 'adjust') {
+                <section class="adjust-workspace">
+                  <div class="adjust-fields">
+                    <label class="field"><span>Tipo de movimiento</span><rms-combobox [ngModelOptions]="{ standalone: true }" ariaLabel="Tipo de movimiento" [options]="adjustmentTypeOptions()" [clearable]="false" [ngModel]="adjustmentType()" (ngModelChange)="setAdjustmentType($event)" /></label>
+                    <label class="field"><span>Clasificación</span><rms-combobox [ngModelOptions]="{ standalone: true }" ariaLabel="Clasificación del ajuste" [options]="adjustmentSourceOptions()" [clearable]="false" [ngModel]="adjustmentSource()" (ngModelChange)="setAdjustmentSource($event)" /><small>Separa propinas y comisiones en el reporte de cajeros.</small></label>
+                    <label class="field"><span>Moneda</span><rms-combobox [ngModelOptions]="{ standalone: true }" ariaLabel="Moneda" [options]="currencyOptions()" [clearable]="false" [ngModel]="adjustmentCurrency()" (ngModelChange)="setAdjustmentCurrency($event)" /></label>
+                    <label class="field"><span>Importe</span><input type="number" min="0.01" step="0.01" [value]="adjustmentAmount()" (input)="setAdjustmentAmount($event)" placeholder="0.00" /></label>
+                    <label class="field field--wide"><span>Motivo</span><textarea rows="3" maxlength="255" [value]="notes()" (input)="setNotes($event)" placeholder="Explica por qué se registra este movimiento"></textarea></label>
+                  </div>
+                  <aside class="adjust-preview"><small>Vista previa</small><strong>{{ adjustmentType() === 'OUT' ? 'Salida/Gasto' : adjustmentType() === 'IN' ? 'Entrada de dinero' : 'Movimiento' }} · {{ adjustmentCurrency() || '—' }}</strong><b>{{ adjustmentAmount() ? (adjustmentAmount() | number:'1.2-2') : '0.00' }}</b><p>{{ adjustmentSourceLabel() }}: el tipo de ajuste determina el signo del movimiento.</p></aside>
+                </section>
+              }
+
+              <footer class="operation-actions"><button class="secondary-button" type="button" (click)="closeReview() ? editCloseReview() : cancelAction()" [disabled]="saving()">{{ closeReview() ? 'Corregir conteo' : 'Volver al monitor' }}</button><button class="action-button action-button--primary" type="button" (click)="confirmAction()" [disabled]="saving() || !canEdit() || !network.online() || (isCountAction() && !countRows().length)">{{ saving() ? 'Procesando…' : action === 'close' ? (closeReview() ? 'Confirmar cierre' : 'Revisar cierre') : action === 'open' ? 'Abrir sesión de caja' : action === 'pre-count' ? 'Registrar precuento' : 'Registrar ajuste' }}</button></footer>
+            </section>
+            }
+          } @else {
+            <header class="detail-heading">
+              <div><span class="eyebrow">CAJA SELECCIONADA</span><h2>{{ row.name }}</h2><p>{{ row.code || 'Caja sin código' }}{{ row.isActive ? '' : ' · Inactiva' }} · Moneda base {{ primaryCurrency() }}</p></div>
+              <span class="status status--large" [class.status--open]="row.isOpen">{{ statusLabel(row) }}</span>
+            </header>
+            <ol class="process-steps" aria-label="Proceso de la caja">
+              <li [class.is-done]="row.isOpen" [class.is-current]="!row.isOpen"><span>1</span><div><strong>Abrir el turno</strong><small>Cuenta el fondo inicial</small></div></li>
+              <li [class.is-done]="row.isOpen" [class.is-current]="row.isOpen"><span>2</span><div><strong>Operar y contar</strong><small>Precuentos y ajustes</small></div></li>
+              <li><span>3</span><div><strong>Cerrar y arquear</strong><small>Compara lo contado con lo esperado</small></div></li>
+            </ol>
+            @if (row.isOpen) {
+              <section class="session-summary">
+                <header><div><h3>Sesión #{{ row.sessionId }}</h3><p>Abierta a las {{ row.openedAtUtc ? formatLocationDate(row.openedAtUtc, 'time') : '—' }} · {{ row.shiftName || 'Turno general' }} · {{ row.userName || 'Operador' }}</p></div><span>{{ primaryCurrency() }} · Moneda base</span></header>
+                @if (summaryLoading()) { <div class="summary-loading" role="status"><span class="spinner"></span>Consultando fondo y resumen del turno…</div> }
+                @if (summaryError(); as message) { <div class="notice notice--warning" role="alert">No se pudo cargar el resumen: {{ message }}</div> }
+                @if (sessionSummary(); as summary) {
+                  <div class="currency-summary-grid">
+                    <article class="currency-summary"><small>Fondo inicial · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ summary.header.openingBalanceBase | number:'1.2-2' }}</strong><small>Moneda base</small></article>
+                    <article class="currency-summary"><small>Ventas del turno · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ summary.header.totalSalesBase | number:'1.2-2' }}</strong><small>Ajustes + {{ summary.header.totalInAdjustmentsBase | number:'1.2-2' }} / − {{ summary.header.totalOutAdjustmentsBase | number:'1.2-2' }}</small></article>
+                    @if (summary.header.closedAtUtc) {
+                      <article class="currency-summary"><small>Esperado al cierre · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ summary.header.closingCalculatedBase | number:'1.2-2' }}</strong><small>Calculado por el backend</small></article>
+                      <article class="currency-summary"><small>Contado al cierre · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ summary.header.closingActualBase | number:'1.2-2' }}</strong><small>Diferencia {{ summary.header.differenceBase | number:'1.2-2' }} · {{ summary.header.arqueoResult || 'Arqueo sin resultado' }}</small></article>
+                    } @else {
+                      <article class="currency-summary"><small>Calculado actual · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ (summary.header.closingCalculatedBase ?? 0) | number:'1.2-2' }}</strong><small>Fondo + ventas + entradas − salidas</small></article>
+                    }
+                  </div>
+                  <p class="summary-note">El fondo inicial no representa el efectivo disponible durante el turno.</p>
+                } @else if (!summaryLoading() && !summaryError()) {
+                  <div class="currency-summary-grid">
+                    <article class="currency-summary"><small>Fondo inicial · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ row.openingBalanceBase | number:'1.2-2' }}</strong><small>Moneda base</small></article>
+                    <article class="currency-summary"><small>Ventas del turno · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ row.totalSalesBase | number:'1.2-2' }}</strong><small>Ajustes + {{ row.inAdjustBase | number:'1.2-2' }} / − {{ row.outAdjustBase | number:'1.2-2' }}</small></article>
+                    <article class="currency-summary"><small>Calculado actual · {{ primaryCurrency() }}</small><strong>{{ primaryCurrency() }} {{ row.currentCalculatedBase | number:'1.2-2' }}</strong><small>Fondo + ventas + entradas − salidas</small></article>
+                  </div>
+                  <p class="summary-note">El fondo inicial no representa el efectivo disponible durante el turno.</p>
+                }
+              </section>
+              <nav class="detail-tabs" aria-label="Información de la sesión">
+                <button type="button" [class.is-active]="detailTab() === 'overview'" (click)="showDetailTab('overview')">Resumen</button>
+                <button type="button" [class.is-active]="detailTab() === 'counts'" (click)="showDetailTab('counts')">Consultar conteos</button>
+                <button type="button" [class.is-active]="detailTab() === 'adjustments'" (click)="showDetailTab('adjustments')">Ajustes</button>
+              </nav>
+              @if (detailTab() === 'overview') {
+                <div class="session-overview">
+                  @for (group of sessionCounts(); track group.countTypeId) { <div><span>{{ group.countType }}<small>{{ group.recordedAt ? formatLocationDate(group.recordedAt) : 'Hora no disponible' }}</small></span><strong class="count-currency-totals">@for (total of countCurrencyTotals(group); track total.currencyCode) { <span>{{ total.currencyCode }} {{ total.amount | number:'1.2-2' }}</span> }</strong></div> }
+                  @if (!sessionCounts().length && !summaryLoading()) { <p>Aún no hay conteos en la sesión.</p> }
+                </div>
+              } @else if (detailTab() === 'counts') {
+                <div class="activity-list">
+                  @for (group of sessionCounts(); track group.countTypeId) {
+                    <section class="activity-group"><header><h3>{{ group.countType }}</h3><span>{{ group.recordedAt ? formatLocationDate(group.recordedAt) : 'Hora no disponible' }} · {{ group.counts.length }} denominaciones</span></header><div class="activity-table"><div class="activity-table__head"><span>Moneda</span><span>Denominación</span><span>Piezas</span><span>Subtotal</span></div>@for (count of group.counts; track count.currencyCode + count.denominationLabel) { <div class="activity-table__row"><span>{{ count.currencyCode }}</span><strong>{{ count.denominationLabel }}</strong><span>{{ count.count }}</span><strong>{{ count.subtotal | number:'1.2-2' }}</strong></div> }</div></section>
+                  } @empty { @if (!summaryLoading()) { <p class="empty-inline">Todavía no se han registrado conteos.</p> } }
+                </div>
+              } @else {
+                <div class="activity-list">
+                  @for (adjustment of sessionSummary()?.adjustments || []; track adjustment.adjustmentId) { <article class="transaction-row"><div><strong>{{ adjustment.adjustmentTypeName }} · {{ adjustment.currencyCode }}</strong><small>{{ adjustment.reason ? adjustment.reason + ' · ' : '' }}{{ adjustment.recordedAt ? formatLocationDate(adjustment.recordedAt) : 'Fecha no disponible' }} · {{ sessionSummary()?.header?.userName || 'Usuario' }}</small></div><b>{{ adjustment.adjustmentType === 'OUT' ? '−' : '+' }}{{ adjustment.amount | number:'1.2-2' }}</b></article> }
+                  @empty { @if (!summaryLoading()) { <p class="empty-inline">No hay ajustes manuales en esta sesión.</p> } }
+                </div>
+              }
+              <footer class="detail-actions">
+                <button class="secondary-button" type="button" (click)="requestAction(row, 'pre-count')" [disabled]="!canEdit() || !network.online()">Registrar precuento</button>
+                <button class="secondary-button" type="button" (click)="requestAction(row, 'adjust')" [disabled]="!canEdit() || !network.online()">Registrar ajuste</button>
+                <button class="action-button action-button--primary" type="button" (click)="requestAction(row, 'close')" [disabled]="!canEdit() || !network.online()">Preparar cierre</button>
+              </footer>
+            } @else {
+              <section class="available-state"><span class="available-state__icon"><rms-cazo-icon name="cash" [size]="23" /></span><h3>Lista para abrir turno</h3><p>Cuenta el fondo inicial por denominación. El total de cada moneda se convierte a {{ primaryCurrency() }} y la sesión se abre en una sola operación.</p><button class="action-button action-button--primary" type="button" (click)="requestAction(row, 'open')" [disabled]="!canEdit() || !network.online()">Abrir sesión de caja</button></section>
+            }
+          }
+        </section>
+      } @else {
+        <section class="monitor-detail empty-detail"><span class="available-state__icon"><rms-cazo-icon name="cash" [size]="23" /></span><h2>Selecciona una caja</h2><p>El detalle del turno y sus operaciones aparecerán aquí.</p></section>
+      }
+    </div>
+  }
+</section>

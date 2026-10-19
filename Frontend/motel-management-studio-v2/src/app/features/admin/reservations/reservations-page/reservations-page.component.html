@@ -1,0 +1,197 @@
+<section class="rms-page res-stack">
+  <rms-page-header eyebrow="HABITACIONES" title="Reservaciones"
+    subtitle="Agenda de llegadas por habitación y tarifa. El listado se pagina en el servidor y los contadores salen del mismo SP.">
+    @if (canManage()) {
+      <button actions type="button" class="rms-btn rms-btn--primary" [disabled]="!network.online()" (click)="openCreate()">
+        <rms-cazo-icon name="plus" [size]="18" /> Nueva reservación
+      </button>
+    }
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de habitaciones">Tu rol no puede consultar las reservaciones. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar la agenda cargada. Para crear o cerrar una reservación necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de reservaciones">
+      <rms-stat-card label="Confirmadas" [value]="store.stats().confirmed" hint="Pendientes de llegada" icon="calendar" tone="brand" [loading]="store.status() === 'loading' && store.reservations().length === 0" />
+      <rms-stat-card label="Hoy" [value]="store.stats().today" hint="Llegadas de hoy en Managua" icon="clock" [loading]="store.status() === 'loading' && store.reservations().length === 0" />
+      <rms-stat-card label="Canceladas" [value]="store.stats().cancelled" hint="Cerradas por cancelación" icon="close" [loading]="store.status() === 'loading' && store.reservations().length === 0" />
+      <rms-stat-card label="No Show" [value]="store.stats().noShow" hint="El cliente no llegó" icon="alert" [loading]="store.status() === 'loading' && store.reservations().length === 0" />
+    </div>
+
+    <rms-filter-bar placeholder="Buscar por cliente, teléfono o habitación…" [search]="store.query().search" [activeCount]="store.activeFilterCount()"
+      (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <rms-combobox filters [options]="statusOptions" [formControl]="statusFilter" placeholder="Todos los estados"
+        emptyText="No hay estados con ese nombre" ariaLabel="Filtrar por estado" />
+      <label class="res-date"><span class="rms-sr-only">Desde</span>
+        <rms-date-field [formControl]="fromControl" [max]="toControl.value || null" ariaLabel="Reservaciones desde" />
+      </label>
+      <label class="res-date"><span class="rms-sr-only">Hasta</span>
+        <rms-date-field [formControl]="toControl" [min]="fromControl.value || null" ariaLabel="Reservaciones hasta" />
+      </label>
+    </rms-filter-bar>
+
+    <rms-data-table [columns]="columns" [rows]="store.reservations()" [loading]="store.status() === 'loading'"
+      [error]="store.errorMessage()" errorTitle="No pudimos cargar las reservaciones" caption="Reservaciones"
+      [trackBy]="trackReservation" [rowClickable]="true" (rowClick)="open($event)" (retry)="store.load(store.query())"
+      [emptyKind]="store.activeFilterCount() ? 'search' : 'empty'"
+      [emptyTitle]="store.activeFilterCount() ? 'No encontramos reservaciones con esos filtros' : 'Todavía no hay reservaciones'"
+      [emptyDescription]="store.activeFilterCount() ? 'Prueba con otra palabra, otro estado o limpia los filtros.' : 'Crea la primera reservación para separar una habitación por fecha y hora.'">
+      <ng-template rmsCell="customer" let-row>
+        <span class="res-cell">
+          <strong>{{ row.customerName }}</strong>
+          <small>{{ row.phone || 'Sin teléfono' }} · ID {{ row.reservationId }}</small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="room" let-row>
+        <span class="res-cell">
+          <strong>Hab. {{ row.roomNumber }}</strong>
+          <small>{{ row.roomTypeName }}</small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="schedule" let-row>
+        <span class="res-cell">
+          <strong>{{ row.reservationStartUtc | date:'d MMM, h:mm a':'America/Managua' }}</strong>
+          <small>hasta {{ row.reservationEndUtc | date:'d MMM, h:mm a':'America/Managua' }}</small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="deposit" let-row>
+        <span class="res-cell res-cell--end">
+          <strong class="num">{{ deposit(row) }}</strong>
+          <small>{{ row.serviceStayTypeName }}</small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="status" let-row>
+        <rms-status-badge [tone]="statusTone(row.statusCode)">{{ row.statusName }}</rms-status-badge>
+      </ng-template>
+      <ng-template rmsCell="actions" let-row>
+        <div class="row-actions">
+          <button type="button" class="rms-icon-btn" (click)="open(row); $event.stopPropagation()"
+            [attr.aria-label]="'Ver la reservación de ' + row.customerName" title="Ver reservación">
+            <rms-cazo-icon name="eye" [size]="16" />
+          </button>
+        </div>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()"
+        [loading]="store.status() === 'loading'" label="reservaciones" [pageSizeOptions]="pageSizes"
+        (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.customerName ?? 'Reservación'" eyebrow="Detalle de la reservación" (closed)="closeDetail()">
+  @if (selected(); as reservation) {
+    <div class="res-detail">
+      <div class="res-detail__head">
+        <span class="res-avatar" aria-hidden="true">{{ reservation.roomNumber }}</span>
+        <div>
+          <strong>Habitación {{ reservation.roomNumber }}</strong>
+          <small>{{ reservation.roomTypeName }} · {{ reservation.serviceStayTypeName }}</small>
+        </div>
+      </div>
+
+      <rms-status-badge [tone]="statusTone(reservation.statusCode)">{{ reservation.statusName }}</rms-status-badge>
+
+      <dl class="res-detail__list">
+        <div><dt>Cliente</dt><dd>{{ reservation.customerName }}</dd></div>
+        <div><dt>Teléfono</dt><dd>{{ reservation.phone || '—' }}</dd></div>
+        <div><dt>Llegada</dt><dd>{{ reservation.reservationStartUtc | date:'EEEE d MMM y, h:mm a':'America/Managua' }}</dd></div>
+        <div><dt>Salida</dt><dd>{{ reservation.reservationEndUtc | date:'EEEE d MMM y, h:mm a':'America/Managua' }}</dd></div>
+        <div><dt>Tarifa</dt><dd>{{ reservation.serviceStayTypeName }}</dd></div>
+        <div><dt>Abono</dt><dd class="num">{{ deposit(reservation) }}</dd></div>
+        <div><dt>Notas</dt><dd>{{ reservation.notes || 'Sin notas' }}</dd></div>
+      </dl>
+
+      @if (pendingClose(); as pending) {
+        <rms-notice tone="danger" [title]="pending === 'cancel' ? '¿Cancelar esta reservación?' : '¿Marcar como No Show?'">
+          {{ pending === 'cancel'
+            ? 'La habitación quedará libre en ese horario. Esta acción no se puede deshacer.'
+            : 'Se registrará que el cliente no llegó. Esta acción no se puede deshacer.' }}
+        </rms-notice>
+        <div class="res-detail__actions">
+          <button type="button" class="rms-btn rms-btn--ghost" [disabled]="!network.online()" (click)="cancelPending()">Volver</button>
+          <button type="button" class="rms-btn rms-btn--danger" [disabled]="!network.online()" (click)="askClose(pending)">
+            {{ pending === 'cancel' ? 'Confirmar cancelación' : 'Confirmar No Show' }}
+          </button>
+        </div>
+      } @else if (!isClosed(reservation) && canManage()) {
+        <div class="res-detail__actions">
+          <button type="button" class="rms-btn rms-btn--ghost" [disabled]="!network.online()" (click)="askClose('noShow')">
+            <rms-cazo-icon name="alert" [size]="16" /> Marcar No Show
+          </button>
+          <button type="button" class="rms-btn rms-btn--danger" [disabled]="!network.online()" (click)="askClose('cancel')">
+            <rms-cazo-icon name="close" [size]="16" /> Cancelar reservación
+          </button>
+        </div>
+      }
+    </div>
+  }
+</rms-drawer>
+
+<rms-drawer [open]="formOpen()" title="Nueva reservación" subtitle="Habitación, tarifa y horario" eyebrow="Reservaciones" (closed)="closeForm()">
+  <form [formGroup]="form" (ngSubmit)="save()" class="res-form" novalidate>
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No pudimos guardar la reservación">{{ message }}</rms-notice>
+    }
+
+    <div class="rms-form-grid">
+      <rms-field label="Habitación" required>
+        <rms-combobox formControlName="roomId" [loader]="searchRooms" placeholder="Busca por número…"
+          emptyText="No encontramos habitaciones con ese número" ariaLabel="Habitación de la reservación" />
+      </rms-field>
+
+      <rms-field label="Tarifa" required hint="Define la duración sugerida de la salida.">
+        <rms-combobox formControlName="serviceStayTypeId" [loader]="searchStayTypes" placeholder="Elige la tarifa…"
+          emptyText="No encontramos tarifas con ese nombre" ariaLabel="Tarifa de la reservación" />
+      </rms-field>
+
+      <rms-field label="Cliente registrado" optional span="full" hint="Si lo eliges, se completan su nombre y teléfono; también puedes escribir un cliente nuevo.">
+        <rms-combobox formControlName="customerId" [loader]="searchCustomers" placeholder="Busca por nombre, documento o teléfono…"
+          emptyText="No encontramos clientes con ese dato" ariaLabel="Cliente registrado" />
+      </rms-field>
+
+      <rms-field label="Cliente" required span="full">
+        <input class="rms-input" formControlName="customerName" maxlength="150" aria-label="Nombre del cliente"
+          placeholder="Ej. Juan Pérez" autocomplete="name" />
+      </rms-field>
+
+      <rms-field label="Teléfono" optional>
+        <input class="rms-input" formControlName="phone" maxlength="50" aria-label="Teléfono del cliente"
+          placeholder="Ej. 8888 8888" autocomplete="tel" />
+      </rms-field>
+
+      <rms-field label="Abono" optional hint="Monto recibido al reservar (C$).">
+        <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="depositAmount" aria-label="Abono de la reservación" />
+      </rms-field>
+
+      <rms-field label="Llegada" required hint="Hora local de Managua.">
+        <input class="rms-input" type="datetime-local" formControlName="startLocal" aria-label="Fecha y hora de llegada" />
+      </rms-field>
+
+      <rms-field label="Salida" required hint="Hora local de Managua.">
+        <input class="rms-input" type="datetime-local" formControlName="endLocal" aria-label="Fecha y hora de salida" />
+      </rms-field>
+
+      <rms-field label="Notas" optional span="full">
+        <input class="rms-input" formControlName="notes" maxlength="300" aria-label="Notas de la reservación"
+          placeholder="Ej. Llega después de medianoche; pide garaje" />
+      </rms-field>
+    </div>
+
+    <p class="res-form__hint">
+      No se pueden reservar horarios en el pasado ni cruzar dos reservaciones confirmadas en la misma habitación.
+      El Check-In real se registra al abrir la estancia desde el POS.
+    </p>
+
+    <div class="res-form__actions">
+      <button type="button" class="rms-btn rms-btn--ghost" [disabled]="store.saving()" (click)="closeForm()">Cancelar</button>
+      <button type="submit" class="rms-btn rms-btn--primary" [disabled]="store.saving() || !network.online()">
+        <rms-cazo-icon name="calendar" [size]="16" />
+        {{ store.saving() ? 'Guardando…' : 'Crear reservación' }}
+      </button>
+    </div>
+  </form>
+</rms-drawer>

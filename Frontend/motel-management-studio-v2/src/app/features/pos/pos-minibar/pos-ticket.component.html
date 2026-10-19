@@ -1,0 +1,90 @@
+<aside class="ticket" aria-label="Carrito de productos del minibar">
+  <header class="ticket__header">
+    <div>
+      <h2>Carrito</h2>
+      <button type="button" aria-label="Vaciar carrito" (click)="cleared.emit()" [disabled]="itemCount() === 0">
+        <rms-cazo-icon name="trash" [size]="17" />
+      </button>
+    </div>
+    <strong>MINIBAR</strong>
+  </header>
+
+  <section class="ticket__context">
+    <span class="ticket__context-icon"><rms-cazo-icon name="home" [size]="18" /></span>
+    <span>
+      <strong>Cargar al cuarto</strong>
+      <small>@if (roomsOpen() === 0) { No hay habitaciones con servicio abierto } @else { Elige la habitación abierta · {{ itemCount() }} artículos }</small>
+    </span>
+    <span class="ticket__mode-badge">CARGA</span>
+  </section>
+
+  @if (roomsOpen() > 0) {
+    <div class="ticket__destination">
+      <label class="ticket__destination-field">
+        <span>Habitación de destino</span>
+        <rms-combobox [ngModelOptions]="{ standalone: true }" ariaLabel="Habitación de destino del carrito" [options]="roomOptions()"
+          placeholder="Hab…" emptyText="No hay habitaciones con ese número"
+          [ngModel]="destinationRoomStayId() === null ? '' : '' + destinationRoomStayId()"
+          (ngModelChange)="onDestinationChange($event)" />
+      </label>
+    </div>
+  }
+
+  <div class="ticket__lines">
+    @if (itemCount() === 0) {
+      <div class="empty-ticket">
+        <span><rms-cazo-icon name="receipt" [size]="25" /></span>
+        <strong>El carrito está vacío</strong>
+        <p>Selecciona productos del minibar para armar la carga.</p>
+      </div>
+    } @else {
+      @for (line of lines(); track line.product.productId) {
+        <article class="ticket-line">
+          <img [src]="image(line)" [alt]="line.product.name" />
+          <div class="ticket-line__content">
+            <div class="ticket-line__title">
+              <strong>{{ line.product.name }}</strong>
+              <button type="button" (click)="removed.emit(line.product.productId)" [attr.aria-label]="'Quitar ' + line.product.name">
+                <rms-cazo-icon name="trash" [size]="14" />
+              </button>
+            </div>
+            <span class="ticket-line__price">{{ line.product.salePrice | currency: currencyCode() : 'symbol-narrow' : '1.0-2' }}</span>
+            <div class="ticket-line__meta">
+              <div class="quantity" aria-label="Cantidad">
+                <button type="button" (click)="changeQuantity(line, -1)" aria-label="Restar uno">−</button>
+                <strong>{{ line.quantity }}</strong>
+                <button type="button" (click)="changeQuantity(line, 1)" [disabled]="line.quantity >= line.product.currentStock" aria-label="Sumar uno">＋</button>
+              </div>
+              <strong>{{ lineTotal(line) | currency: currencyCode() : 'symbol-narrow' : '1.0-2' }}</strong>
+            </div>
+            @if (exceedsStock(line)) {
+              <small class="ticket-line__stock-warning"><rms-cazo-icon name="alert" [size]="12" />{{ stockHint(line) }}</small>
+            }
+            <label class="ticket-line__note"><span>Nota para esta línea</span><textarea rows="2" maxlength="255" [value]="line.note" (input)="updateNote(line, $event)" placeholder="Ej. enfriar, entregar en recepción…"></textarea></label>
+          </div>
+        </article>
+      }
+    }
+  </div>
+
+  <div class="ticket__summary">
+    <dl>
+      <div><dt>Artículos</dt><dd>{{ itemCount() }}</dd></div>
+      <div><dt>Destino</dt><dd>{{ destinationLabel() ?? 'Sin habitación' }}</dd></div>
+    </dl>
+
+    <div class="total-card">
+      <span><strong>Total del carrito ({{ currencyCode() }})</strong><small>Cada línea se registra como consumo propio</small></span>
+      <strong>{{ total() | currency: currencyCode() : 'symbol-narrow' : '1.0-2' }}</strong>
+    </div>
+
+    <button class="checkout" type="button" (click)="checkout.emit()" [disabled]="!canSubmit()">
+      <span class="shortcut">F8</span>
+      <strong>{{ saving() ? 'Cargando consumos…' : 'Cargar al cuarto · ' + (total() | currency: currencyCode() : 'symbol-narrow' : '1.0-2') }}</strong>
+      <rms-cazo-icon name="chevron-right" [size]="19" />
+    </button>
+    @if (destinationRoomStayId() === null) {
+      <small class="ticket__save-hint">@if (roomsOpen() === 0) { Abre un servicio para cargar el minibar. } @else { Elige la habitación de destino del carrito. }</small>
+    }
+  </div>
+</aside>

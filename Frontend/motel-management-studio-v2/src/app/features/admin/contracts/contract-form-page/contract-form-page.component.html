@@ -1,0 +1,121 @@
+@if (loading()) {
+  <section class="rms-page" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir el contrato" [description]="message">
+      <a class="rms-btn rms-btn--secondary" [routerLink]="backLink">Volver a contratos</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar contrato' : 'Nuevo contrato'" eyebrow="RECURSOS HUMANOS"
+    [subtitle]="isEdit ? 'Corrige las condiciones de este contrato. Los pagos ya registrados no cambian.' : 'Congela en papel lo acordado: puesto, modalidad y salario. El turno extra por día se registra aparte en la ficha.'"
+    [backLink]="backLink" backLabel="Volver a contratos" [steps]="steps" [current]="step()" [maxReached]="reached()" [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside (stepSelect)="goTo($event)">
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Necesitas conexión para guardar el contrato.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="hr-stack" novalidate>
+      @switch (step()) {
+        @case (0) {
+          <rms-panel title="¿Para quién es?" subtitle="Busca al empleado del directorio.">
+            <div class="rms-form-grid">
+              <rms-field label="Empleado" required span="full"
+                [error]="form.controls.employeeId.touched && form.controls.employeeId.invalid ? 'Elige a quién corresponde el contrato.' : null">
+                <rms-combobox formControlName="employeeId" [loader]="searchEmployees" [selectedOptions]="selectedEmployee()" [minChars]="0"
+                  placeholder="Busca un empleado…" emptyText="No encontramos empleados con ese nombre" ariaLabel="Empleado" [disabled]="isEdit"
+                  (optionSelected)="onEmployeePicked($event)" />
+              </rms-field>
+              <rms-field label="Puesto del contrato" required span="full" [error]="positionError()"
+                hint="Lo acordado al firmar; puede cambiar respecto al puesto actual de la ficha.">
+                <input class="rms-input" formControlName="position" maxlength="100" autocomplete="off" placeholder="Ej. Recepción de noche" />
+              </rms-field>
+            </div>
+          </rms-panel>
+        }
+        @case (1) {
+          <rms-panel title="¿Cómo se le paga?" subtitle="La modalidad define cómo se calcula la nómina del contrato.">
+            <div class="hr-choice" role="radiogroup" aria-label="Modalidad de pago del contrato">
+              @for (option of paymentTypes; track option.value) {
+                <button type="button" role="radio" [attr.aria-checked]="paymentTypeValue() === option.value"
+                  [class.is-selected]="paymentTypeValue() === option.value" (click)="selectPaymentType(option.value)">
+                  <strong>{{ option.label }}</strong><small>{{ option.hint }}</small>
+                </button>
+              }
+            </div>
+
+            <div class="rms-form-grid">
+              <rms-field label="Salario o tarifa base" required [error]="amountError()">
+                <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="baseAmount" placeholder="0.00" />
+              </rms-field>
+              <rms-field label="Moneda">
+                <rms-combobox formControlName="currencyCode" [options]="currencies" [clearable]="false" ariaLabel="Moneda" />
+              </rms-field>
+              <rms-field label="Inicia" required>
+                <rms-date-field formControlName="startDate" ariaLabel="Fecha de inicio" />
+              </rms-field>
+              <rms-field label="Termina" optional hint="Déjalo vacío si el contrato es indefinido.">
+                <rms-date-field formControlName="endDate" ariaLabel="Fecha de fin" />
+              </rms-field>
+              <rms-field label="Horario del contrato" optional span="full"
+                hint="El turno de referencia; un extra fuera de este horario se paga aparte por día.">
+                <input class="rms-input" formControlName="scheduleNotes" maxlength="300" autocomplete="off" placeholder="Ej. Martes a sábado, 10pm-6am" />
+              </rms-field>
+              <rms-field label="Notas" optional span="full">
+                <input class="rms-input" formControlName="notes" maxlength="500" autocomplete="off" placeholder="Ej. Renovación automática cada año" />
+              </rms-field>
+            </div>
+
+            <div class="switch-list">
+              <label class="switch-card">
+                <input type="checkbox" class="rms-switch" formControlName="isActive" />
+                <span>
+                  <strong>{{ isEdit ? 'Contrato vigente' : 'Dejarlo vigente al registrarlo' }}</strong>
+                  <small>
+                    @if (isEdit) { Al apagarlo, el contrato pasa al historial igual que «Terminar contrato»: sus pagos y reportes quedan intactos. }
+                    @else { Si lo apagas, el contrato se registra terminado y no cuenta como el vigente del empleado. }
+                  </small>
+                </span>
+              </label>
+            </div>
+          </rms-panel>
+        }
+      }
+    </form>
+
+    <aside aside>
+      <rms-panel title="Resumen" raised>
+        <ul class="hr-summary">
+          <li><span>Empleado</span><strong>{{ summary().employee }}</strong></li>
+          <li><span>Puesto</span><strong>{{ summary().position }}</strong></li>
+          <li><span>Modalidad</span><strong>{{ summary().paymentType }}</strong></li>
+          <li><span>Salario / tarifa</span><strong class="num">{{ summary().currency }} {{ summary().amount | number:'1.2-2' }}</strong></li>
+          <li><span>Inicia</span><strong>{{ summary().start }}</strong></li>
+          <li><span>Termina</span><strong>{{ summary().end }}</strong></li>
+          <li><span>Horario</span><strong>{{ summary().schedule }}</strong></li>
+        </ul>
+      </rms-panel>
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      @if (step() > 0) { <button type="button" class="rms-btn rms-btn--secondary" (click)="previous()">Atrás</button> }
+      @if (step() === 0) {
+        <button type="button" class="rms-btn rms-btn--primary" (click)="next()">Continuar <rms-cazo-icon name="arrow-right" [size]="16" /></button>
+      } @else {
+        <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online()" (click)="save()">
+          @if (saving()) { <span class="rms-spinner"></span> Guardando… } @else { <rms-cazo-icon name="check" [size]="16" /> {{ isEdit ? 'Guardar cambios' : 'Registrar contrato' }} }
+        </button>
+      }
+    </ng-container>
+  </rms-form-page>
+}

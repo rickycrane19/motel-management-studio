@@ -1,0 +1,106 @@
+@if (loading()) {
+  <section class="rms-page supplier-form-loading" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir el proveedor" [description]="message">
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="load()">Reintentar</button>
+      <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Volver a proveedores</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar proveedor' : 'Nuevo proveedor'"
+    eyebrow="PROVEEDORES"
+    [subtitle]="isEdit ? 'Actualiza los datos de contacto; los cambios llegan al registrar compras.' : 'Registra a quién le compras y a quién le devuelves, con sus datos de contacto.'"
+    [backLink]="backLink" backLabel="Volver a proveedores"
+    [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside>
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes revisar el proveedor, pero necesitas conexión para guardarlo.</rms-notice>
+    }
+    @if (!canManage()) {
+      <rms-notice tone="danger" title="No tienes permiso de inventario">Tu rol no puede crear ni editar proveedores. Pídele a quien administra tu negocio el permiso de inventario.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="supplier-form" novalidate>
+      <rms-panel title="Datos del proveedor" subtitle="Así lo verás al elegirlo en una compra.">
+        <div class="rms-form-grid">
+          <rms-field label="Nombre del proveedor" required span="full" [error]="nameError()">
+            <input class="rms-input" formControlName="name" maxlength="150" autocomplete="off" placeholder="Ej. Distribuidora Central" />
+          </rms-field>
+          <rms-field label="Persona de contacto" optional [error]="contactError()" hint="Con quién hablas cuando pides mercancía.">
+            <input class="rms-input" formControlName="contactName" maxlength="150" autocomplete="off" placeholder="Ej. Doña Marta" />
+          </rms-field>
+          <rms-field label="Teléfono" optional [error]="phoneError()">
+            <input class="rms-input" formControlName="phone" maxlength="50" autocomplete="off" placeholder="Ej. 8888 8888" />
+          </rms-field>
+          <rms-field label="Correo" optional [error]="emailError()">
+            <input class="rms-input" formControlName="email" type="email" maxlength="150" autocomplete="off" placeholder="Ej. ventas@proveedor.com" />
+          </rms-field>
+          <rms-field label="RUC" optional hint="Número de identificación tributaria, si lo tienes.">
+            <input class="rms-input" formControlName="taxId" maxlength="50" autocomplete="off" placeholder="Ej. J0310000000000" />
+          </rms-field>
+          <rms-field label="Dirección" optional span="full">
+            <input class="rms-input" formControlName="address" maxlength="250" autocomplete="off" placeholder="Ej. Mercado Oriental, Managua" />
+          </rms-field>
+        </div>
+      </rms-panel>
+
+      <rms-panel title="Notas internas" subtitle="Detalles tuyos para recordar (días de reparto, condiciones…).">
+        <div class="rms-form-grid">
+          <rms-field label="Notas" optional span="full" hint="Quedan guardadas solo en el maestro de proveedores.">
+            <input class="rms-input" formControlName="notes" maxlength="500" autocomplete="off" placeholder="Ej. Reparte los martes y viernes" />
+          </rms-field>
+        </div>
+      </rms-panel>
+
+      @if (isEdit) {
+        <rms-panel title="Disponibilidad" subtitle="Decide si el proveedor sigue disponible al registrar compras.">
+          <div class="switch-list">
+            <label class="switch-card">
+              <input type="checkbox" class="rms-switch" formControlName="isActive" />
+              <span>
+                <strong>Proveedor activo</strong>
+                <small>Si lo apagas, deja de aparecer al elegir proveedor en las compras, pero sus documentos ya registrados no cambian.</small>
+              </span>
+            </label>
+          </div>
+        </rms-panel>
+      } @else {
+        <rms-notice tone="info" title="Los proveedores nuevos se crean activos">Si después necesitas retirarlo, puedes desactivarlo desde el listado sin borrarlo.</rms-notice>
+      }
+    </form>
+
+    <aside aside class="supplier-aside">
+      <rms-panel title="Vista previa" subtitle="Así lo verás al comprar." raised>
+        <article class="preview-card">
+          <div class="preview-card__top">
+            <span class="preview-card__icon" aria-hidden="true"><rms-cazo-icon name="truck" [size]="22" /></span>
+            <span class="preview-card__status" [class.is-off]="!isActiveValue()">{{ isActiveValue() ? 'Activo' : 'Desactivado' }}</span>
+          </div>
+          <div class="preview-card__body">
+            <h3>{{ nameValue().trim() || 'Nombre del proveedor' }}</h3>
+            <p>{{ contactSummary() || 'Sin datos de contacto' }}</p>
+            @if (form.controls.email.value.trim()) { <p>{{ form.controls.email.value.trim() }}</p> }
+            <small>{{ form.controls.address.value.trim() || 'Sin dirección registrada' }}</small>
+          </div>
+        </article>
+      </rms-panel>
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online() || !canManage()" (click)="save()">
+        {{ saving() ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear proveedor' }}
+      </button>
+    </ng-container>
+  </rms-form-page>
+}

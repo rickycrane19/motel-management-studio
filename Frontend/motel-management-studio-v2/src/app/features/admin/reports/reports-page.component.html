@@ -1,0 +1,162 @@
+<section class="rms-page reports-stack">
+  <rms-page-header eyebrow="FINANZAS" title="Reportes consolidados"
+    subtitle="Ganancias, pérdidas, servicios, productos, inventario y nómina del motel, leídos directo por su fuente.">
+    <ng-container actions>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="csv(store.tab())" [disabled]="store.status() === 'loading'">
+        <rms-cazo-icon name="download" [size]="18" /> Exportar CSV
+      </button>
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="print()" [disabled]="store.status() === 'loading' || !canView()">
+        <rms-cazo-icon name="printer" [size]="18" /> Exportar PDF
+      </button>
+    </ng-container>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de reportes">Tu rol no puede consultar los reportes financieros. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar lo que ya cargó. Para actualizar necesitas conexión.</rms-notice>
+    }
+
+    <rms-tabs [tabs]="tabs" [active]="store.tab()" ariaLabel="Pestañas de reportes" idPrefix="rms-report-tab" (activeChange)="showTab($event)" data-print="hide" />
+
+    <rms-filter-bar [searchable]="false" [activeCount]="store.activeFilterCount()" (cleared)="clearFilters()">
+      <ng-container filters>
+        <div class="reports-quick" role="group" aria-label="Rangos rápidos">
+          @for (range of quickRanges; track range.id) {
+            <button type="button" class="rms-btn rms-btn--sm reports-quick__range"
+              [class.is-active]="isQuickActive(range)" (click)="applyQuickRange(range.id)">{{ range.label }}</button>
+          }
+        </div>
+        <label class="reports-date"><span class="rms-sr-only">Desde</span>
+          <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+        </label>
+        <label class="reports-date"><span class="rms-sr-only">Hasta</span>
+          <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+        </label>
+      </ng-container>
+    </rms-filter-bar>
+
+    <div id="reportPrintArea" class="reports-print">
+      <p class="reports-range">Período leído: {{ store.startDate() }} al {{ store.endDate() }} (America/Managua · C$ NIO)</p>
+
+      @if (store.errorMessage()) {
+        <rms-notice tone="danger" title="No pudimos cargar el reporte">{{ store.errorMessage() }}</rms-notice>
+      }
+
+      @switch (store.tab()) {
+        @case ('summary') {
+          <div class="rms-stats" aria-label="Resumen del período">
+            <rms-stat-card label="Ingresos totales" [value]="money(summaryTotals().income)" hint="Por su fuente" icon="trend-up" tone="success" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Egresos totales" [value]="money(summaryTotals().expense)" hint="Por su fuente" icon="trend-down" tone="danger" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Resultado neto" [value]="money(summaryTotals().net)" hint="Ingresos − egresos" icon="chart" tone="brand" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Estancias cerradas" [value]="store.summary()?.data?.closedStays ?? 0" hint="Status 2 = finalizado/cobrado" icon="bed" tone="soft" [loading]="store.status() === 'loading'" />
+          </div>
+
+          <rms-data-table [columns]="columns.get('summary')!" [rows]="summaryLines()" [loading]="store.status() === 'loading' && !summaryLines().length"
+            caption="Ganancias y pérdidas por fuente" [trackBy]="trackLine" emptyTitle="Sin movimientos en el período" emptyDescription="Cambia el rango de fechas o registra ingresos y egresos.">
+            <ng-template rmsCell="label" let-row><strong>{{ row.label }}</strong></ng-template>
+            <ng-template rmsCell="kind" let-row>
+              <span [class.reports-kind--income]="row.kind === 'income'" [class.reports-kind--expense]="row.kind === 'expense'">{{ row.kind === 'income' ? 'Ingreso' : 'Egreso' }}</span>
+            </ng-template>
+            <ng-template rmsCell="amount" let-row>
+              <span class="reports-amount" [class.is-income]="row.kind === 'income'" [class.is-expense]="row.kind === 'expense'">{{ money(row.amount) }}</span>
+            </ng-template>
+          </rms-data-table>
+        }
+        @case ('service') {
+          <div class="rms-stats" aria-label="Resumen de servicios">
+            <rms-stat-card label="Estancias cerradas" [value]="serviceSummary().stays" icon="bed" tone="soft" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Ingreso de servicios" [value]="money(serviceSummary().total)" icon="trend-up" tone="brand" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Duración promedio" [value]="hours(serviceSummary().avgHours)" icon="clock" tone="soft" [loading]="store.status() === 'loading'" />
+          </div>
+
+          <rms-data-table [columns]="columns.get('service')!" [rows]="store.serviceSales()?.rows ?? []" [loading]="store.status() === 'loading' && !(store.serviceSales()?.rows?.length)"
+            caption="Ventas por tipo de tarifa y tipo de llegada" [trackBy]="trackServiceRow" emptyTitle="Sin estancias cerradas en ese rango" emptyDescription="Cambia el rango de fechas o registra ellas en POS.">
+            <ng-template rmsCell="stayTypeName" let-row>
+              <span class="reports-cell"><strong>{{ row.stayTypeName }}</strong><small>Tarifa #{{ row.serviceStayTypeId }}</small></span>
+            </ng-template>
+            <ng-template rmsCell="mainRevenue" let-row><span class="reports-amount">{{ money(row.baseRevenue + row.extensionRevenue) }}</span></ng-template>
+            <ng-template rmsCell="productsRevenue" let-row><span class="reports-amount">{{ money(row.productsRevenue) }}</span></ng-template>
+            <ng-template rmsCell="finesRevenue" let-row><span class="reports-amount">{{ money(row.finesRevenue) }}</span></ng-template>
+            <ng-template rmsCell="totalRevenue" let-row><strong class="reports-amount is-income">{{ money(row.totalRevenue) }}</strong></ng-template>
+            <ng-template rmsCell="avgHours" let-row><span>{{ hours(row.avgHours) }}</span></ng-template>
+            <ng-template rmsCell="stays" let-row><span class="reports-amount">{{ row.stays }}</span></ng-template>
+            <ng-template rmsCell="avgStayTotal" let-row><strong class="reports-amount">{{ money(row.avgStayTotal) }}</strong></ng-template>
+          </rms-data-table>
+        }
+        @case ('products') {
+          <div class="rms-stats" aria-label="Resumen de productos">
+            <rms-stat-card label="Unidades vendidas" [value]="productSummary().units" icon="package" tone="soft" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Ingreso minibar" [value]="money(productSummary().revenue)" icon="trend-up" tone="brand" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Margen" [value]="money(productSummary().margin)" icon="chart" tone="success" [loading]="store.status() === 'loading'" />
+          </div>
+
+          <rms-data-table [columns]="columns.get('products')!" [rows]="store.productSales()?.rows ?? []" [loading]="store.status() === 'loading' && !(store.productSales()?.rows?.length)"
+            caption="Productos vendidos en estancias cerradas del período" [trackBy]="trackProductRow" emptyTitle="Sin ventas de minibar en ese rango" emptyDescription="Cambia el rango de fechas.">
+            <ng-template rmsCell="productName" let-row>
+              <span class="reports-cell"><strong>{{ row.productName }}</strong><small>{{ row.productCode }}</small></span>
+            </ng-template>
+            <ng-template rmsCell="soldQuantity" let-row><span class="reports-amount">{{ row.soldQuantity | number:'1.0-2' }} {{ row.unitOfMeasure }}</span></ng-template>
+            <ng-template rmsCell="revenue" let-row><strong class="reports-amount is-income">{{ money(row.revenue) }}</strong></ng-template>
+            <ng-template rmsCell="cost" let-row><span class="reports-amount">{{ money(row.cost) }}</span></ng-template>
+            <ng-template rmsCell="margin" let-row><strong class="reports-amount" [class.is-income]="row.margin >= 0" [class.is-expense]="row.margin < 0">{{ money(row.margin) }}</strong></ng-template>
+          </rms-data-table>
+        }
+        @case ('inventory') {
+          <div class="rms-stats" aria-label="Resumen de inventario">
+            <rms-stat-card label="Valor del inventario" [value]="money(inventorySummary().stockValue)" hint="Stock × costo" icon="layers" tone="brand" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Bajo mínimo" [value]="inventorySummary().underMin" hint="Productos a reponer" icon="alert" tone="warning" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Compras del período" [value]="money(inventorySummary().purchases)" icon="tag" tone="soft" [loading]="store.status() === 'loading'" />
+          </div>
+
+          <rms-data-table [columns]="columns.get('inventory')!" [rows]="store.inventory()?.rows ?? []" [loading]="store.status() === 'loading' && !(store.inventory()?.rows?.length)"
+            caption="Valor de stock y actividad del kardex del período" [trackBy]="trackInventoryRow" emptyTitle="Inventario sin productos activos" emptyDescription="Registra productos para ver valor de stock.">
+            <ng-template rmsCell="productName" let-row>
+              <span class="reports-cell"><strong>{{ row.productName }}</strong><small>{{ row.productCode }}</small></span>
+            </ng-template>
+            <ng-template rmsCell="stock" let-row>
+              <span class="reports-amount"><strong [class.is-expense]="row.isUnderMinStock">{{ row.currentStock | number:'1.0-2' }}</strong> <small>{{ row.unitOfMeasure }}</small></span>
+            </ng-template>
+            <ng-template rmsCell="minStock" let-row>
+              <span class="reports-amount"><em>{{ row.minStock | number:'1.0-2' }}</em></span>
+            </ng-template>
+            <ng-template rmsCell="costPrice" let-row><span class="reports-amount">{{ money(row.costPrice) }}</span></ng-template>
+            <ng-template rmsCell="stockValue" let-row><strong class="reports-amount">{{ money(row.stockValue) }}</strong></ng-template>
+            <ng-template rmsCell="purchaseCost" let-row><span class="reports-amount">{{ money(row.purchaseCost) }}</span></ng-template>
+            <ng-template rmsCell="soldQuantity" let-row><span class="reports-amount">{{ row.soldQuantity | number:'1.0-2' }}</span></ng-template>
+          </rms-data-table>
+        }
+        @case ('payroll') {
+          <div class="rms-stats" aria-label="Resumen de nómina">
+            <rms-stat-card label="Empleados pagados" [value]="payrollSummary().employees" icon="users" tone="soft" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Bruto pagado" [value]="money(payrollSummary().grossPaid)" hint="Base + bonos" icon="cash" tone="brand" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Deducciones" [value]="money(payrollSummary().deductions)" hint="INSS, IR, préstamos y adelantos" icon="minus" tone="soft" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Neto pagado" [value]="money(payrollSummary().netPaid)" hint="Lo que salió de caja" icon="check" tone="brand" [loading]="store.status() === 'loading'" />
+            <rms-stat-card label="Turnos extra" [value]="money(payrollSummary().extraPaid)" hint="Fuera del contrato vigente" icon="clock" tone="warning" [loading]="store.status() === 'loading'" />
+          </div>
+
+          <rms-data-table [columns]="columns.get('payroll')!" [rows]="store.payroll()?.rows ?? []" [loading]="store.status() === 'loading' && !(store.payroll()?.rows?.length)"
+            caption="Pagos a empleados" [trackBy]="trackPayrollRow" emptyTitle="No hay pagos en ese rango" emptyDescription="Cambia el rango de fechas.">
+            <ng-template rmsCell="fullName" let-row>
+              <span class="reports-cell"><strong>{{ row.fullName }}</strong><small>#{{ row.employeeId }} · {{ row.position }}</small></span>
+            </ng-template>
+            <ng-template rmsCell="contractPaymentType" let-row><em>{{ row.contractPaymentType || '—' }}</em></ng-template>
+            <ng-template rmsCell="grossPaid" let-row><span class="reports-amount">{{ money(row.grossPaid) }}</span></ng-template>
+            <ng-template rmsCell="deductionsAmount" let-row>
+              <span class="reports-amount" [title]="'INSS ' + money(row.inssDeductions) + ' · IR ' + money(row.irDeductions) + ' · Préstamos ' + money(row.loanDeductions) + ' · Adelantos ' + money(row.advanceDeductions) + ' · Otros ' + money(row.otherDeductions)">
+                <strong [class.is-expense]="row.deductionsAmount > 0">{{ money(row.deductionsAmount) }}</strong>
+                @if (row.deductionsAmount > 0) { <small>INSS {{ money(row.inssDeductions) }}</small> }
+              </span>
+            </ng-template>
+            <ng-template rmsCell="netPaid" let-row><strong class="reports-amount">{{ money(row.netPaid) }}</strong></ng-template>
+            <ng-template rmsCell="extraPaid" let-row>
+              <span class="reports-amount"><strong [class.is-expense]="row.extraPaid > 0">{{ money(row.extraPaid) }}</strong> <small>{{ row.extraPayments }} pago(s)</small></span>
+            </ng-template>
+            <ng-template rmsCell="lastPaidAtUtc" let-row><small>{{ row.lastPaidAtUtc ? (row.lastPaidAtUtc | date:'d MMM y, h:mm a':'America/Managua') : '—' }}</small></ng-template>
+          </rms-data-table>
+        }
+      }
+    </div>
+  }
+</section>

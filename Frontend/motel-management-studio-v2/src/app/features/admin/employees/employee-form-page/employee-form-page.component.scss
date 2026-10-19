@@ -1,0 +1,15 @@
+:host { display: block; }
+.employee-stack { display: grid; gap: 18px; }
+
+.employee-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;
+  button { display: grid; gap: 4px; padding: 14px; border: 1.5px solid var(--cazo-line-strong); border-radius: var(--cazo-radius-md);
+    background: var(--cazo-surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
+    transition: border-color .15s var(--cazo-ease), background-color .15s var(--cazo-ease);
+    strong { font-size: 14px; } small { color: var(--cazo-muted); font-size: 12px; line-height: 1.4; }
+    &:hover { border-color: var(--cazo-brand); }
+    &.is-selected { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); }
+    &:focus-visible { outline: 0; box-shadow: var(--cazo-focus-ring); } } }
+
+.employee-summary { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none;
+  li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; span { color: var(--cazo-muted); } strong { text-align: right; overflow-wrap: anywhere; } } }
+.num { font-variant-numeric: tabular-nums; font-family: var(--cazo-font-display); }

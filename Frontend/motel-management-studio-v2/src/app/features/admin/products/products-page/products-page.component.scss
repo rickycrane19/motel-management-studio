@@ -1,0 +1,47 @@
+:host { display: block; }
+.products-page { display: grid; gap: 16px; }
+.rms-btn.is-disabled { pointer-events: none; opacity: .55; }
+.filter-supplier { min-width: 220px; }
+.filter-status { min-width: 200px; }
+.product-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* La columna del producto toma el espacio sobrante y recorta con puntos suspensivos, nunca invade a la siguiente. */
+:host ::ng-deep td:has(.product-cell) { width: 100%; max-width: 0; min-width: 220px; }
+.product-cell img { width: 48px; height: 48px; flex: none; border-radius: 12px; object-fit: cover; background: var(--cazo-surface-sunken); }
+.product-cell span { display: grid; gap: 2px; min-width: 0; }
+.product-cell strong { display: block; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.product-cell small, .cell-sub { display: block; max-width: 100%; overflow: hidden; color: var(--cazo-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.cell-main { display: block; font-size: 14px; }
+.cell-price { display: block; font-variant-numeric: tabular-nums; font-size: 14px; }
+.mono-cell { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--cazo-ink-soft); }
+.row-actions { display: inline-flex; align-items: center; gap: 6px; }
+.detail { display: grid; gap: 14px; }
+.detail__image { width: 100%; aspect-ratio: 16 / 10; border-radius: var(--cazo-radius-lg); object-fit: cover; background: var(--cazo-surface-sunken); }
+.detail__badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail__description { margin: 0; color: var(--cazo-ink-soft); font-size: 14px; line-height: 1.5; }
+.detail__list { display: grid; gap: 10px; margin: 0; padding: 14px 16px; border-radius: var(--cazo-radius-md); background: var(--cazo-surface-raised); }
+.detail__list div { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; }
+.detail__list dt { color: var(--cazo-muted); }
+.detail__list dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.detail__title { margin: 6px 0 0; font-size: 15px; }
+.detail__prices { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.detail__prices li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--cazo-line); border-radius: 10px; font-size: 14px; }
+.detail__prices li span { display: inline-flex; align-items: center; gap: 8px; }
+.detail__prices strong { font-variant-numeric: tabular-nums; }
+.detail__empty { color: var(--cazo-muted); }
+.drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.drawer-actions .rms-btn { justify-content: center; }
+.drawer-actions__wide { grid-column: 1 / -1; }
+
+.cards-state { display: grid; gap: 6px; padding: 32px 16px; text-align: center; color: var(--cazo-muted); border: 1px dashed var(--cazo-line); border-radius: var(--cazo-radius-lg); }
+.product-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.product-card { display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; border: 1px solid var(--cazo-line); border-radius: var(--cazo-radius-lg); background: var(--cazo-surface); }
+.product-card--off { opacity: .78; }
+.product-card__media { position: relative; display: block; padding: 0; border: 0; background: var(--cazo-surface-sunken); cursor: pointer; }
+.product-card__media img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.product-card__badge { position: absolute; top: 8px; left: 8px; }
+.product-card__body { display: grid; align-content: start; gap: 4px; padding: 12px 14px; min-width: 0; }
+.product-card__name { font-size: 15px; overflow-wrap: anywhere; }
+.product-card__body small { color: var(--cazo-muted); font-size: 12px; }
+.product-card__body em { color: var(--cazo-muted); font-style: normal; font-size: 12px; }
+.product-card__actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 14px; border-top: 1px solid var(--cazo-line); }
+.product-card__actions .rms-btn { flex: 1 1 auto; justify-content: center; }

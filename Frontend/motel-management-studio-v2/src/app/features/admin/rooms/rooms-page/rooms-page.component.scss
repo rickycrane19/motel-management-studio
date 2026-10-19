@@ -1,0 +1,40 @@
+:host { display: block; }
+.rooms-page { display: grid; gap: 16px; }
+.rms-btn.is-disabled { pointer-events: none; opacity: .55; }
+.filter-type { min-width: 210px; }
+.filter-floor { min-width: 140px; }
+.filter-physical { min-width: 190px; }
+.filter-activity { min-width: 180px; }
+.room-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* La columna de la habitación toma el espacio sobrante y recorta con puntos suspensivos. */
+:host ::ng-deep td:has(.room-person) { width: 100%; max-width: 0; min-width: 200px; }
+.room-avatar {
+  width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; border-radius: 14px;
+  color: var(--cazo-brand-strong); background: var(--cazo-brand-soft);
+  &.is-off { color: var(--cazo-muted); background: var(--cazo-surface-sunken); }
+}
+.room-cell { display: grid; gap: 2px; min-width: 0;
+  strong { font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--cazo-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.row-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.detail { display: grid; gap: 14px; }
+.detail__hero {
+  display: grid; justify-items: center; gap: 4px; padding: 22px 16px; text-align: center;
+  border: 1px solid var(--cazo-line); border-radius: var(--cazo-radius-lg);
+  background: linear-gradient(135deg, var(--cazo-brand-soft), var(--cazo-surface));
+  color: var(--cazo-brand-strong);
+  strong { font: 650 26px/1.1 var(--cazo-font-display); color: var(--cazo-ink); }
+  span { color: var(--cazo-muted); font-size: 13px; }
+  &.is-off { background: var(--cazo-surface-sunken); color: var(--cazo-muted);
+    strong { color: var(--cazo-muted); } }
+}
+.detail__badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail__description { margin: 0; color: var(--cazo-ink-soft); font-size: 14px; line-height: 1.5; }
+.detail__list { display: grid; gap: 10px; margin: 0; padding: 14px 16px; border-radius: var(--cazo-radius-md); background: var(--cazo-surface-raised); }
+.detail__list div { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; }
+.detail__list dt { color: var(--cazo-muted); }
+.detail__list dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.drawer-actions .rms-btn { justify-content: center; }
+.drawer-actions__wide { grid-column: 1 / -1; }

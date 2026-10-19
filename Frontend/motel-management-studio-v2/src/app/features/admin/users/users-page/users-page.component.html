@@ -1,0 +1,169 @@
+<section class="rms-page users-stack">
+  <rms-page-header eyebrow="SEGURIDAD" title="Usuarios del sistema"
+    subtitle="Cuentas que pueden iniciar sesión en el motel: perfil, correo, contraseña y estado. El listado se pagina en el servidor.">
+    @if (canManage()) {
+      <button actions type="button" class="rms-btn rms-btn--primary" [disabled]="!network.online()" (click)="openCreate()">
+        <rms-cazo-icon name="plus" [size]="18" /> Nuevo usuario
+      </button>
+    }
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de seguridad">Tu rol no puede administrar los usuarios del sistema. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar los usuarios cargados. Para crear, editar o activar cuentas necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de seguridad">
+      <rms-stat-card label="Usuarios" [value]="store.stats().total" hint="Registrados en el motel" icon="users" tone="brand" [loading]="store.status() === 'loading' && store.users().length === 0" />
+      <rms-stat-card label="Activos" [value]="store.stats().active" hint="Pueden iniciar sesión" icon="check" [loading]="store.status() === 'loading' && store.users().length === 0" />
+      <rms-stat-card label="Perfiles" [value]="store.stats().roles" hint="Roles distintos en uso" icon="shield" [loading]="store.status() === 'loading' && store.users().length === 0" />
+    </div>
+
+    <rms-filter-bar placeholder="Buscar por usuario, nombre o correo…" [search]="store.query().search" [activeCount]="store.activeFilterCount()"
+      (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <rms-combobox filters [options]="roleOptions" [formControl]="roleFilterControl" placeholder="Todos los perfiles"
+        emptyText="No hay perfiles con ese nombre" ariaLabel="Filtrar por perfil" />
+    </rms-filter-bar>
+
+    <rms-data-table [columns]="columns" [rows]="store.users()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()"
+      errorTitle="No pudimos cargar los usuarios" caption="Usuarios del sistema" [trackBy]="trackUser" [rowClickable]="true"
+      (rowClick)="open($event)" (retry)="store.load(store.query())"
+      [emptyKind]="visibleWithFilters() ? 'search' : 'empty'"
+      [emptyTitle]="visibleWithFilters() ? 'No encontramos usuarios con esos filtros' : 'Todavía no hay usuarios'"
+      [emptyDescription]="visibleWithFilters() ? 'Prueba con otra palabra o limpia los filtros.' : 'Crea la primera cuenta para que tu equipo pueda iniciar sesión.'">
+      <ng-template rmsCell="user" let-row>
+        <div class="users-person">
+          <span class="users-avatar" aria-hidden="true">{{ initialsOf(row) }}</span>
+          <span class="users-cell">
+            <strong>{{ row.username }}</strong>
+            <small>{{ row.fullName || 'Sin nombre registrado' }}@if (isCurrentUser(row)) { · Tu cuenta }</small>
+          </span>
+        </div>
+      </ng-template>
+      <ng-template rmsCell="contact" let-row>
+        <span class="users-cell users-cell--wrap"><strong>{{ row.email }}</strong><small>ID {{ row.userId }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="role" let-row>
+        <rms-status-badge tone="brand">{{ roleLabel(row.role) }}</rms-status-badge>
+      </ng-template>
+      <ng-template rmsCell="since" let-row>
+        <span class="users-cell"><strong>{{ row.createdOn | date:'d MMM y' }}</strong><small>{{ row.createdOn | date:'h:mm a':'America/Managua' }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="status" let-row>
+        <rms-status-badge [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Vigente' : 'Inactivo' }}</rms-status-badge>
+      </ng-template>
+      <ng-template rmsCell="actions" let-row>
+        <div class="row-actions">
+          @if (canManage()) {
+            <button type="button" class="rms-icon-btn" [disabled]="!network.online()" (click)="openEdit(row); $event.stopPropagation()"
+              [attr.aria-label]="'Editar el usuario ' + row.username" title="Editar usuario">
+              <rms-cazo-icon name="edit" [size]="16" />
+            </button>
+            <button type="button" class="rms-icon-btn" [disabled]="!network.online() || isCurrentUser(row)"
+              (click)="toggleActive(row, $event)"
+              [attr.aria-label]="(row.isActive ? 'Desactivar el usuario ' : 'Activar el usuario ') + row.username"
+              [title]="isCurrentUser(row) ? 'No puedes desactivar tu propia cuenta' : (row.isActive ? 'Desactivar usuario' : 'Activar usuario')">
+              <rms-cazo-icon [name]="row.isActive ? 'close' : 'check'" [size]="16" />
+            </button>
+          }
+        </div>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+        label="usuarios" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.username ?? 'Usuario'" eyebrow="Detalle del usuario" (closed)="closeDetail()">
+  @if (selected(); as user) {
+    <div class="users-detail">
+      <div class="users-detail__head">
+        <span class="users-avatar users-avatar--lg" aria-hidden="true">{{ initialsOf(user) }}</span>
+        <div>
+          <strong>{{ user.fullName || user.username }}</strong>
+          <small>{{ user.email }}</small>
+        </div>
+      </div>
+      <dl class="users-detail__list">
+        <div><dt>Nombre de usuario</dt><dd>{{ user.username }}</dd></div>
+        <div><dt>Nombre completo</dt><dd>{{ user.fullName || '—' }}</dd></div>
+        <div><dt>Correo</dt><dd>{{ user.email }}</dd></div>
+        <div><dt>Perfil</dt><dd><rms-status-badge tone="brand">{{ roleLabel(user.role) }}</rms-status-badge></dd></div>
+        <div><dt>Estado</dt><dd><rms-status-badge [tone]="user.isActive ? 'success' : 'neutral'">{{ user.isActive ? 'Vigente' : 'Inactivo' }}</rms-status-badge></dd></div>
+        <div><dt>Identificador</dt><dd>ID {{ user.userId }}</dd></div>
+        <div><dt>Registrado</dt><dd>{{ user.createdOn | date:'d MMM y, h:mm a':'America/Managua' }}</dd></div>
+      </dl>
+      @if (isCurrentUser(user)) {
+        <rms-notice tone="info" title="Tu cuenta">Puedes cambiar tu nombre, correo y contraseña, pero no desactivar tu propia cuenta.</rms-notice>
+      }
+      @if (canManage()) {
+        <div class="users-detail__actions">
+          <button type="button" class="rms-btn rms-btn--primary" [disabled]="!network.online()" (click)="openEdit(user)">
+            <rms-cazo-icon name="edit" [size]="16" /> Editar ficha
+          </button>
+          <button type="button" class="rms-btn rms-btn--ghost" [disabled]="!network.online() || isCurrentUser(user)"
+            (click)="toggleActive(user, $event)">
+            <rms-cazo-icon [name]="user.isActive ? 'close' : 'check'" [size]="16" />
+            {{ user.isActive ? 'Desactivar cuenta' : 'Activar cuenta' }}
+          </button>
+        </div>
+      }
+    </div>
+  }
+</rms-drawer>
+
+<rms-drawer [open]="formOpen()" [title]="editingId() === null ? 'Nuevo usuario' : 'Editar usuario'"
+  subtitle="Ficha, perfil y acceso" eyebrow="Seguridad" (closed)="closeForm()">
+  <form [formGroup]="form" (ngSubmit)="save()" class="users-form" novalidate>
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No pudimos guardar el usuario">{{ message }}</rms-notice>
+    }
+
+    <div class="rms-form-grid">
+      <rms-field label="Nombre completo" required span="full">
+        <input class="rms-input" formControlName="fullName" maxlength="150" aria-label="Nombre completo"
+          placeholder="Ej. María López" autocomplete="name" />
+      </rms-field>
+
+      <rms-field label="Nombre de usuario" required hint="Letras, números, punto, guion y guion bajo.">
+        <input class="rms-input" formControlName="username" maxlength="100" aria-label="Nombre de usuario"
+          placeholder="Ej. recepcion" autocomplete="username" />
+      </rms-field>
+
+      <rms-field label="Correo" required>
+        <input class="rms-input" type="email" formControlName="email" maxlength="150" aria-label="Correo"
+          placeholder="Ej. recepcion@motel.com" autocomplete="email" />
+      </rms-field>
+
+      <rms-field label="Perfil" required span="full">
+        <rms-combobox formControlName="role" [options]="roleOptions" [clearable]="false" ariaLabel="Perfil del usuario" />
+      </rms-field>
+
+      <rms-field label="Contraseña" [required]="editingId() === null"
+        [hint]="editingId() === null ? 'Mínimo 6 caracteres.' : 'Déjala vacía para conservar la contraseña actual.'">
+        <input class="rms-input" type="password" formControlName="password" maxlength="100" aria-label="Contraseña"
+          autocomplete="new-password" placeholder="••••••" />
+      </rms-field>
+
+      <rms-field label="Confirmar contraseña" [required]="editingId() === null" hint="Repite la contraseña para evitar errores.">
+        <input class="rms-input" type="password" formControlName="confirmPassword" maxlength="100" aria-label="Confirmar contraseña"
+          autocomplete="new-password" placeholder="••••••" />
+      </rms-field>
+    </div>
+
+    <p class="users-form__hint">
+      Los perfiles definen qué módulos ve la cuenta. El administrador siempre tiene acceso total y debe quedar al menos
+      un administrador activo en el motel.
+    </p>
+
+    <div class="users-form__actions">
+      <button type="button" class="rms-btn rms-btn--ghost" [disabled]="store.saving()" (click)="closeForm()">Cancelar</button>
+      <button type="submit" class="rms-btn rms-btn--primary" [disabled]="store.saving() || !network.online()">
+        <rms-cazo-icon name="check" [size]="16" />
+        {{ store.saving() ? 'Guardando…' : (editingId() === null ? 'Crear usuario' : 'Guardar cambios') }}
+      </button>
+    </div>
+  </form>
+</rms-drawer>

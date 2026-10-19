@@ -1,0 +1,96 @@
+<section class="rms-page purchases-stack">
+  <rms-page-header eyebrow="INVENTARIO" title="Compras y devoluciones a proveedor"
+    subtitle="Documentos que mueven dinero: lo que entra y se paga, y lo que sale al proveedor y reintegra a caja.">
+    <ng-container actions>
+      <a class="rms-btn rms-btn--primary" routerLink="nueva" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Registrar documento</a>
+    </ng-container>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de inventario">Tu rol no puede consultar compras ni devoluciones. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar lo que ya cargó. Para registrar un documento necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de compras">
+      <rms-stat-card label="Documentos" [value]="store.stats().documents" hint="En las fechas elegidas" icon="receipt" tone="brand" [loading]="store.status() === 'loading' && store.purchases().length === 0" />
+      <rms-stat-card label="Comprado" [value]="store.stats().boughtAmount" hint="Importe de compras (C$)" icon="package" [loading]="store.status() === 'loading' && store.purchases().length === 0" />
+      <rms-stat-card label="Devuelto al proveedor" [value]="store.stats().returnedAmount" hint="Importe de devoluciones (C$)" icon="swap" [loading]="store.status() === 'loading' && store.purchases().length === 0" />
+    </div>
+
+    <rms-filter-bar [placeholder]="'Buscar por proveedor, documento o nota…'" [search]="store.query().search" [activeCount]="store.activeFilterCount()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <label filters class="purchases-date"><span class="rms-sr-only">Desde</span>
+        <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+      </label>
+      <label filters class="purchases-date"><span class="rms-sr-only">Hasta</span>
+        <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+      </label>
+      <rms-combobox filters [options]="typeOptions" [formControl]="typeControl" placeholder="Todos los tipos" emptyText="No hay tipos con ese nombre" ariaLabel="Filtrar por tipo de documento" />
+    </rms-filter-bar>
+
+    <rms-data-table [columns]="columns" [rows]="store.purchases()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()" errorTitle="No pudimos cargar los documentos"
+      caption="Documentos de compra y devolución a proveedor" [trackBy]="trackPurchase" [rowClickable]="true" (rowClick)="open($event)" (retry)="store.load(store.query())"
+      emptyTitle="No hay documentos en esas fechas" emptyDescription="Cambia el rango de fechas, limpia los filtros o registra un documento.">
+      <ng-template rmsCell="when" let-row>
+        <span class="purchases-cell"><strong>{{ row.createdOnUtc | date:'d MMM y':'America/Managua' }}</strong><small>{{ row.createdOnUtc | date:'h:mm a':'America/Managua' }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="document" let-row>
+        <span class="purchases-cell purchases-cell--wrap">
+          <span><rms-status-badge [tone]="row.purchaseType === 'DevolucionProveedor' ? 'warning' : 'success'" [dot]="false">{{ typeLabel(row.purchaseType) }}</rms-status-badge> <strong class="purchases-doc-id">No. {{ row.purchaseId }}</strong></span>
+          <small>
+            @if (row.supplierId !== null) { <rms-cazo-icon name="truck" [size]="12" /> }
+            {{ supplierOf(row) }}@if (row.referenceDoc) { · {{ row.referenceDoc }} } · {{ row.lineCount }} línea(s)
+          </small>
+        </span>
+      </ng-template>
+      <ng-template rmsCell="amount" let-row>
+        <span class="purchases-cell purchases-cell--num">
+          <strong>{{ row.currencyCode }} {{ row.totalAmount | number:'1.2-2' }}</strong>
+          @if (row.notes) { <small>{{ row.notes }}</small> }
+        </span>
+      </ng-template>
+      <ng-template rmsCell="cash" let-row>
+        <span class="purchases-cell purchases-cell--num">
+          <strong>@if (row.cashBoxSessionId !== null) { No. {{ row.cashBoxSessionId }} } @else { <span class="purchases-nocash">Sin caja</span> }</strong>
+        </span>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+        label="documentos" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected() ? typeLabel(selected()!.purchaseType) + ' No. ' + selected()!.purchaseId : 'Documento'" eyebrow="Detalle del documento" (closed)="closeDetail()">
+  @if (selected(); as purchase) {
+    <div class="purchases-detail">
+      <rms-status-badge [tone]="purchase.purchaseType === 'DevolucionProveedor' ? 'warning' : 'success'" [dot]="false">
+        {{ purchase.purchaseType === 'DevolucionProveedor' ? 'Sale inventario · dinero entra a caja si aplica' : 'Entra inventario · dinero sale de caja si aplica' }}
+      </rms-status-badge>
+      <dl class="purchases-detail__list">
+        <div><dt>Proveedor</dt><dd>{{ supplierOf(purchase) }} @if (purchase.supplierId !== null) { <rms-status-badge tone="brand" [dot]="false">Del maestro</rms-status-badge> }</dd></div>
+        <div><dt>Documento de referencia</dt><dd>{{ purchase.referenceDoc || '—' }}</dd></div>
+        <div><dt>Importe total</dt><dd>{{ purchase.currencyCode }} {{ purchase.totalAmount | number:'1.2-2' }}</dd></div>
+        <div><dt>Sesión de caja</dt><dd>@if (purchase.cashBoxSessionId !== null) { No. {{ purchase.cashBoxSessionId }} } @else { No movió dinero en caja }</dd></div>
+        <div><dt>Notas</dt><dd>{{ purchase.notes || '—' }}</dd></div>
+        <div><dt>Cuándo</dt><dd>{{ purchase.createdOnUtc | date:'d MMM y, h:mm a':'America/Managua' }}</dd></div>
+      </dl>
+
+      <h4 class="purchases-detail__subtitle">Líneas del documento</h4>
+      @if (selectedLoading()) {
+        <span class="rms-skeleton rms-skeleton--block" aria-busy="true"></span>
+      } @else if (selectedError(); as message) {
+        <rms-notice tone="danger" title="No pudimos cargar las líneas">{{ message }}</rms-notice>
+      } @else if (selectedItems(); as items) {
+        <ul class="purchases-detail__items">
+          @for (item of items; track item.purchaseItemId) {
+            <li>
+              <span><strong>{{ item.productName }}</strong><small>{{ item.productCode }} · {{ item.quantity | number:'1.0-2' }} {{ item.unitOfMeasure }} × {{ item.unitCost | number:'1.2-2' }}</small></span>
+              <strong>{{ item.lineTotal | number:'1.2-2' }}</strong>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+</rms-drawer>

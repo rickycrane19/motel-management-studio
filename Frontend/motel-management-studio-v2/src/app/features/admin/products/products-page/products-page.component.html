@@ -1,0 +1,92 @@
+<section class="rms-page products-page">
+  <rms-page-header title="Productos" subtitle="El minibar de tus habitaciones, con su precio y su stock al día.">
+    @if (canCreate()) {
+      <a actions class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Nuevo producto</a>
+    }
+  </rms-page-header>
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Puedes ver el catálogo que ya cargó. Para crear o cambiar productos necesitas conexión.</rms-notice>
+  }
+
+  <div class="rms-stats" aria-label="Resumen del catálogo">
+    <rms-stat-card label="Productos" [value]="store.stats().total" hint="En tu catálogo" icon="grid" tone="brand" [loading]="store.status() === 'loading' && store.products().length === 0" />
+    <rms-stat-card label="Visibles" [value]="store.stats().active" hint="Se ven en el minibar" icon="eye" [loading]="store.status() === 'loading' && store.products().length === 0" />
+    <rms-stat-card label="Ocultos" [value]="store.stats().inactive" hint="No se venden por ahora" icon="eye-off" [loading]="store.status() === 'loading' && store.products().length === 0" />
+    <rms-stat-card label="Stock bajo" [value]="store.stats().lowStock" hint="Repón antes de que se agoten" icon="package" [tone]="store.stats().lowStock ? 'warning' : 'soft'" [loading]="store.status() === 'loading' && store.products().length === 0" />
+  </div>
+
+  <rms-filter-bar placeholder="Buscar producto por nombre o código…" [search]="store.query().name" [activeCount]="activeFilters()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+    <rms-combobox filters class="filter-category" [options]="categories()" [formControl]="categoryControl" placeholder="Todas las categorías" emptyText="No hay categorías con ese nombre" ariaLabel="Filtrar por categoría" />
+    <rms-combobox filters class="filter-status" [options]="statusOptions" [formControl]="statusControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+    <button actions type="button" class="rms-btn rms-btn--secondary" (click)="exportCurrentPage()" [disabled]="store.products().length === 0">
+      <rms-cazo-icon name="download" [size]="17" /> Exportar página
+    </button>
+  </rms-filter-bar>
+
+  @if (tableError(); as error) {
+    <rms-notice tone="danger" title="No pudimos cargar tus productos">{{ error }} <button type="button" class="rms-btn rms-btn--secondary rms-btn--sm" (click)="store.load()">Reintentar</button></rms-notice>
+  } @else if (store.status() === 'loading' && store.products().length === 0) {
+    <p class="cards-state" role="status">Cargando productos…</p>
+  } @else if (store.products().length === 0) {
+    <div class="cards-state"><strong>{{ store.query().name || activeFilters() ? 'No encontramos productos con esos filtros' : 'Aún no tienes productos' }}</strong>
+      <span>{{ store.query().name || activeFilters() ? 'Prueba con otra palabra o limpia los filtros.' : 'Crea el primero para empezar a cobrarlos desde el minibar.' }}</span></div>
+  } @else {
+    <ul class="product-cards" aria-label="Catálogo de productos" [attr.aria-busy]="store.status() === 'loading'">
+      @for (row of store.products(); track row.productId) {
+        <li class="product-card" [class.product-card--off]="!row.isActive" [attr.data-qa]="'product-card'">
+          <button type="button" class="product-card__media" (click)="open(row)" [attr.aria-label]="'Ver detalle de ' + row.name">
+            <img [src]="productImage(row)" [alt]="row.name" loading="lazy" decoding="async" />
+            <rms-status-badge class="product-card__badge" [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Visible' : 'Oculto' }}</rms-status-badge>
+          </button>
+          <div class="product-card__body">
+            <strong class="product-card__name">{{ row.name }}</strong>
+            <small>{{ row.categoryName }} · {{ row.code }}</small>
+            <span class="cell-price">C$ {{ row.salePrice | number:'1.2-2' }}<em>{{ row.costPrice > 0 ? ' · costo C$ ' + (row.costPrice | number:'1.2-2') : '' }}</em></span>
+            <small [class.is-low]="row.isLowStock">{{ stockLabel(row) }}{{ row.isLowStock ? ' · stock bajo' : '' }}</small>
+          </div>
+          <div class="product-card__actions" (click)="$event.stopPropagation()">
+            @if (canUpdate()) {
+              <a class="rms-btn rms-btn--primary rms-btn--sm" [routerLink]="[row.productId, 'editar']" [attr.aria-label]="'Editar ' + row.name"><rms-cazo-icon name="edit" [size]="15" /> Editar</a>
+              <button type="button" class="rms-btn rms-btn--secondary rms-btn--sm" [disabled]="!network.online() || store.busyProductId() === row.productId" (click)="toggleStatus(row)" [attr.aria-label]="(row.isActive ? 'Ocultar ' : 'Mostrar ') + row.name">
+                <rms-cazo-icon [name]="row.isActive ? 'eye-off' : 'eye'" [size]="15" /> {{ row.isActive ? 'Desactivar' : 'Activar' }}
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+    <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+      label="productos" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="setPageSize($event)" />
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.name ?? 'Producto'" [subtitle]="selected()?.categoryName ?? null" eyebrow="Detalle del producto" (closed)="closeDetail()">
+  @if (selected(); as product) {
+    <ng-container>
+      <div class="detail">
+      <img class="detail__image" [src]="productImage(product)" [alt]="product.name" />
+      <div class="detail__badges">
+        <rms-status-badge [tone]="product.isActive ? 'success' : 'neutral'">{{ product.isActive ? 'Visible' : 'Oculto' }}</rms-status-badge>
+        <rms-status-badge [tone]="product.isLowStock ? 'warning' : 'success'" [dot]="false">{{ product.isLowStock ? 'Stock bajo' : 'Stock ok' }}</rms-status-badge>
+      </div>
+      @if (product.description) { <p class="detail__description">{{ product.description }}</p> }
+      <dl class="detail__list">
+        <div><dt>Código</dt><dd>{{ product.code }}</dd></div>
+        <div><dt>Unidad de medida</dt><dd>{{ product.unitOfMeasure }}</dd></div>
+        <div><dt>Costo</dt><dd>C$ {{ product.costPrice | number:'1.2-2' }}</dd></div>
+        <div><dt>Precio de venta</dt><dd>C$ {{ product.salePrice | number:'1.2-2' }}</dd></div>
+        <div><dt>Existencias</dt><dd>{{ stockLabel(product) }} (mínimo {{ product.minStock }})</dd></div>
+      </dl>
+    </div>
+    <div footer class="drawer-actions">
+      @if (canUpdate()) { <a class="rms-btn rms-btn--primary drawer-actions__wide" [routerLink]="[product.productId, 'editar']" (click)="closeDetail()"><rms-cazo-icon name="edit" [size]="16" /> Editar</a> }
+      @if (canUpdate()) {
+        <button type="button" class="rms-btn rms-btn--secondary" [disabled]="!network.online() || store.busyProductId() === product.productId" (click)="toggleStatus(product)">
+          <rms-cazo-icon [name]="product.isActive ? 'eye-off' : 'eye'" [size]="16" /> {{ product.isActive ? 'Ocultar' : 'Mostrar' }}
+        </button>
+      }
+    </div>
+    </ng-container>
+  }
+</rms-drawer>

@@ -1,0 +1,147 @@
+<div class="modal-backdrop" role="presentation" (click)="closed.emit()">
+  <section
+    #dialog
+    class="payment-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="payment-title"
+    tabindex="-1"
+    (click)="$event.stopPropagation()"
+  >
+    <header>
+      <span class="header-icon"><rms-cazo-icon name="wallet" [size]="21" /></span>
+      <span>
+        <h2 id="payment-title">Cobrar estancia · {{ roomLabel() }}</h2>
+        <small>Saldo pendiente en NIO · método {{ selectedMethod() }}</small>
+      </span>
+      <button class="close" type="button" aria-label="Cerrar cobro" [disabled]="submitting()" (click)="closed.emit()">
+        <rms-cazo-icon name="close" [size]="23" />
+      </button>
+    </header>
+
+    @if (bill(); as bill) {
+      <div class="amount-card">
+        <span>
+          <small>TOTAL DE LA ESTANCIA · NIO</small>
+          <strong>{{ bill.totalAmount | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</strong>
+        </span>
+        <span>
+          <small>SALDO PENDIENTE · NIO</small>
+          <strong>{{ pendingAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</strong>
+          <em>@if (paidBefore() > 0) { Pagado antes C$ {{ paidBefore() | number:'1.0-2' }} } @else { Sin pagos previos }</em>
+        </span>
+      </div>
+
+      <section class="payment-details" aria-label="Detalles del cobro">
+        <div class="payment-details__heading">
+          <div class="payment-details__title">
+            <div class="payment-details__title-row">
+              <h3>Cómo se cobra</h3>
+              <span class="payment-details__count">{{ selectedMethod() }}</span>
+            </div>
+            <small>El backend guarda el monto cobrado y el método; la cuenta se cierra con el checkout.</small>
+          </div>
+          <span class="payment-details__base">{{ bill.baseServiceCost + bill.extensionCost | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }} servicio + {{ bill.productsTotal | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }} minibar + {{ bill.finesTotal | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }} multas</span>
+        </div>
+
+        <div class="method-grid" role="group" aria-label="Método de pago">
+          @for (method of paymentMethods; track method.key) {
+            <button type="button" [class.is-active]="selectedMethod() === method.key" (click)="selectMethod(method.key)">
+              <span class="method-icon"><rms-cazo-icon [name]="method.icon" [size]="18" /></span>
+              <span class="method-copy">
+                <strong>{{ method.key }}</strong>
+                <small>{{ method.small }}</small>
+              </span>
+              @if (selectedMethod() === method.key) {
+                <span class="selected"><rms-cazo-icon name="check" [size]="12" /></span>
+              }
+            </button>
+          }
+        </div>
+
+        <div class="cash-grid">
+          <label>
+            <span>Monto pagado (NIO)</span>
+            <span class="cash-input">
+              <input type="number" min="0" step="0.01" [value]="paidValue() || ''" (input)="updatePaid($event)" aria-label="Monto pagado del cobro" />
+              <b>NIO</b>
+            </span>
+          </label>
+          <div class="change-card">
+            @if (overpaid()) {
+              <small>CAMBIO A DEVOLVER</small>
+              <strong>{{ changeAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</strong>
+              <span>Pagado {{ paidValue() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }} de {{ pendingAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</span>
+            } @else {
+              <small>FALTA CUBRIR</small>
+              <strong>{{ underpaidAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</strong>
+              <span>Pagado {{ paidValue() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }} de {{ pendingAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</span>
+            }
+          </div>
+        </div>
+
+        @if (selectedMethod() !== 'Tarjeta') {
+          <div class="quick-amounts">
+            <span>Efectivo rápido</span>
+            <div>
+              @for (amount of quickAmounts; track amount) {
+                <button type="button" (click)="setQuickAmount(amount)" [attr.aria-label]="'Pagar ' + amount + ' córdobas'">C$ {{ amount }}</button>
+              }
+            </div>
+            <button type="button" class="quick-amounts__exact" (click)="setQuickAmount(pendingAmount())">C$ exacto</button>
+          </div>
+        }
+
+        <label class="payment-note">
+          <span>Notas del cobro</span>
+          <textarea rows="2" maxlength="255" [value]="notes()" (input)="updateNotes($event)"
+            [placeholder]="selectedMethod() === 'Mixto' ? 'Ej. mitad C$ 1 500 efectivo, resto en tarjeta…' : 'Observación libre del cobro…'"></textarea>
+        </label>
+      </section>
+
+      @if (equivalents().length > 0) {
+        <section class="currency-legend" aria-label="Equivalente en divisas (informativo)">
+          <div class="section-heading">
+            <strong>Divisas · display informativo</strong>
+            <small>Solo lectura: el cobro se guarda en córdobas (NIO)</small>
+          </div>
+          <div class="currency-legend__row currency-legend__row--head">
+            <span>Moneda</span><span>Tasa</span><span>Total</span><span>Saldo</span>
+          </div>
+          @for (item of equivalents(); track item.currencyCode) {
+            <div class="currency-legend__row">
+              <span><strong>{{ item.currencyCode }}</strong></span>
+              <small>1 = {{ item.rate | number:'1.0-4' }} C$</small>
+              <small>{{ totalAmount() / item.rate | number:'1.0-2' }}</small>
+              <small>{{ pendingAmount() / item.rate | number:'1.0-2' }}</small>
+            </div>
+          }
+        </section>
+      }
+    } @else {
+      <div class="method-state"><span class="method-spinner"></span>Cargando la cuenta de la estancia…</div>
+    }
+
+    <footer>
+      <span [class.integration-warning]="errorMessage() || validationMessage()" role="status">
+        @if (errorMessage() || validationMessage(); as message) {
+          {{ message }}
+        } @else if (!overpaid() && pendingAmount() > 0 && paidValue() > 0 && (bill()?.totalAmount ?? 0) > 0) {
+          Falta cubrir el saldo: el cobro registra {{ paidValue() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }} de {{ pendingAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}.
+        } @else if (submitting()) {
+          Confirmando el checkout de la estancia…
+        } @else {
+          La habitación se libera cuando el checkout queda confirmado.
+        }
+      </span>
+      <div>
+        <button class="cancel" type="button" [disabled]="submitting()" (click)="closed.emit()">Cancelar</button>
+        <button class="confirm" type="button" [disabled]="!canSubmit()" (click)="confirmPayment()">
+          <span>Enter</span>
+          <strong>Cobrar estancia · {{ pendingAmount() | currency: 'NIO' : 'symbol-narrow' : '1.0-2' }}</strong>
+          <rms-cazo-icon name="chevron-right" [size]="18" />
+        </button>
+      </div>
+    </footer>
+  </section>
+</div>

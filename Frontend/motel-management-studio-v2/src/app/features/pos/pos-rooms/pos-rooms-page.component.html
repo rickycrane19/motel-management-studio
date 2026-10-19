@@ -1,0 +1,457 @@
+<section class="rooms-page rms-page">
+  <rms-page-header
+    title="Servicio al cuarto"
+    eyebrow="Punto de venta · El Rapidin"
+    subtitle="Check-in, extensiones, multas y cobro: el carrito de servicio de cada habitación.">
+    <button actions class="rms-btn rms-btn--secondary" type="button" (click)="load()" [disabled]="loading()">
+      <rms-cazo-icon name="refresh" [size]="17" /> Actualizar
+    </button>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" dismissible>
+      <strong>Sin sesión vigente</strong><span>Inicia sesión de recepción para ver el estado de las habitaciones.</span>
+    </rms-notice>
+  }
+
+  @if (canView()) {
+    @if (!network.online()) {
+      <rms-notice tone="offline">
+        <strong>Sin conexión</strong><span>Se muestra la última información cargada. Conéctate para actualizar o hacer cambios.</span>
+      </rms-notice>
+    }
+    @if (successMessage(); as message) {
+      <rms-notice tone="success" [title]="'Listo'" dismissible (dismissed)="successMessage.set(null)">
+        {{ message }}
+      </rms-notice>
+    }
+    @if (!selectedRoom() && errorMessage(); as message) {
+      <rms-notice tone="danger" [title]="'No se completó la operación'" dismissible (dismissed)="errorMessage.set(null)">
+        {{ message }}
+      </rms-notice>
+    }
+
+    <section class="metrics" aria-label="Resumen de las habitaciones">
+      <article class="metric metric--featured">
+        <span class="metric__icon"><rms-cazo-icon name="home" [size]="22" /></span>
+        <span>
+          <small>Habitaciones</small>
+          <strong>{{ summary().total }}</strong>
+          <em>{{ floor() === 'all' ? 'Todos los pisos' : 'Piso ' + floor() }}</em>
+        </span>
+      </article>
+      <article class="metric">
+        <span class="metric__icon"><rms-cazo-icon name="check" [size]="22" /></span>
+        <span><small>Libres</small><strong>{{ summary().free }}</strong><em>Listas para check-in</em></span>
+      </article>
+      <article class="metric">
+        <span class="metric__icon"><rms-cazo-icon name="wallet" [size]="22" /></span>
+        <span><small>Ocupadas</small><strong>{{ summary().occupied }}</strong><em>Servicio en curso</em></span>
+      </article>
+      <article class="metric">
+        <span class="metric__icon"><rms-cazo-icon name="alert" [size]="22" /></span>
+        <span>
+          <small>Atención</small>
+          <strong>{{ summary().cleaning + summary().maintenance + summary().reserved }}</strong>
+          <em>{{ summary().cleaning }} limpieza · {{ summary().maintenance }} mantenimiento · {{ summary().reserved }} reservadas</em>
+        </span>
+      </article>
+    </section>
+
+    <section class="rooms-card">
+      <header class="rooms-heading">
+        <div>
+          <span class="eyebrow">RECEPCIÓN EN VIVO</span>
+          <h2>Habitaciones del motel</h2>
+          <p>Selecciona una habitación para iniciar el servicio, extenderla o cobrar la salida.</p>
+        </div>
+        <div class="toolbar">
+          <label class="toolbar__search">
+            <rms-cazo-icon name="search" [size]="15" />
+            <input type="search" aria-label="Buscar habitación, huésped o placa"
+              placeholder="Número, huésped o placa…" [value]="searchText()" (input)="setSearch($event)" />
+          </label>
+        </div>
+      </header>
+
+      @if (floors().length > 1) {
+        <div class="rooms-filters">
+          <rms-tabs [tabs]="floorTabs()" [active]="floor() === 'all' ? 'all' : '' + floor()"
+            (activeChange)="onFloorTab($event)" ariaLabel="Pisos del motel" idPrefix="pos-floor" />
+        </div>
+      }
+
+      <div class="status-filter" role="group" aria-label="Estado de las habitaciones">
+        <span class="status-filter__label">Estado</span>
+        @for (chip of statusChips(); track chip.id) {
+          <button type="button" class="section-pill" [class.is-active]="statusFilter() === chip.id"
+            [attr.aria-pressed]="statusFilter() === chip.id" (click)="selectStatus(chip.id)">
+            {{ chip.label }}<b>{{ chip.count }}</b>
+          </button>
+        }
+      </div>
+
+      <div class="legend" aria-label="Leyenda de estados">
+        <span><i class="dot dot--available"></i>Libre</span>
+        <span><i class="dot dot--occupied"></i>Ocupada</span>
+        <span><i class="dot dot--attention"></i>Limpieza</span>
+        <span><i class="dot dot--out"></i>Mantenimiento</span>
+        <span><i class="dot dot--reserved"></i>Reservada</span>
+      </div>
+
+      @if (loading()) {
+        <div class="state" role="status">
+          <span class="spinner"></span>
+          <strong>Cargando habitaciones</strong>
+          <p>Consultando el estado de las habitaciones del motel.</p>
+        </div>
+      } @else if (visibleRows().length === 0) {
+        <rms-empty-state [compact]="true" icon="home"
+          title="No hay habitaciones que mostrar"
+          [description]="rows().length === 0 ? 'Aún no hay habitaciones registradas para esta sucursal.' : 'Prueba con otro estado, piso o búsqueda.'">
+          @if (rows().length > 0) {
+            <button class="rms-btn rms-btn--secondary" type="button" (click)="selectStatus(null); searchText.set('')">Limpiar filtros</button>
+          }
+        </rms-empty-state>
+      } @else {
+        <div class="rooms-grid-wrap">
+          <div class="rooms-grid">
+            @for (room of visibleRows(); track room.roomId) {
+              <button
+                [class]="'room-node room-node--' + statusTone(room)"
+                [class.is-selected]="selectedRoom()?.roomId === room.roomId"
+                type="button"
+                (click)="selectRoom(room)"
+                [attr.aria-label]="'Habitación ' + room.roomNumber + ', ' + room.roomTypeName + ', ' + room.statusName">
+                <span class="room-node__status"><rms-status-badge [tone]="badgeTone(room)">{{ room.statusName }}</rms-status-badge></span>
+                <span class="room-node__number">{{ room.roomNumber }}</span>
+                <span class="room-node__meta">{{ room.roomTypeName }} · {{ room.capacity }} personas</span>
+                @if (room.hasGarage || room.hasJacuzzi) {
+                  <span class="room-node__tags">
+                    @if (room.hasGarage) { <span class="room-node__tag"><rms-cazo-icon name="lock" [size]="12" />Garaje</span> }
+                    @if (room.hasJacuzzi) { <span class="room-node__tag"><rms-cazo-icon name="sparkles" [size]="12" />Jacuzzi</span> }
+                  </span>
+                }
+                @if (room.statusCode === 1) {
+                  <span class="room-node__stay">
+                    <span><rms-cazo-icon name="clock" [size]="12" />{{ stayTime(room) }}</span>
+                    @if (room.isExpiringSoon) { <small class="room-node__warn"><rms-cazo-icon name="alert" [size]="11" />Por vencer</small> }
+                    @if (room.totalAmount !== undefined) { <b>{{ money(room.totalAmount) }} {{ currencyCode() }}</b> }
+                  </span>
+                } @else {
+                  <span class="room-node__note">{{ roomNote(room) }}</span>
+                }
+                @if (room.isExpiringSoon && room.statusCode === 1) { <rms-cazo-icon name="alert" [size]="15" class="room-node__alert" /> }
+              </button>
+            }
+          </div>
+        </div>
+        <footer class="rooms-summary" role="status">
+          <rms-cazo-icon name="info" [size]="14" />
+          <span><strong>{{ summary().occupied }}</strong> de <strong>{{ summary().total }}</strong> ocupadas · {{ summary().cleaning }} en limpieza · {{ summary().maintenance }} en mantenimiento · {{ summary().reserved }} reservadas{{ cashSessionOpen() ? ' · Caja activa' : ' · Sin caja activa' }}</span>
+        </footer>
+      }
+    </section>
+  }
+</section>
+
+@if (selectedRoom(); as room) {
+  <div class="detail-backdrop" (click)="closeRoom()"></div>
+  <aside #roomDetail class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="room-detail-title" aria-describedby="room-detail-context">
+    <header class="detail-panel__header">
+      <div>
+        <span class="detail-panel__context" id="room-detail-context">Habitación #{{ room.roomId }} · Piso {{ room.floorNumber }}</span>
+        <h2 id="room-detail-title">{{ room.roomNumber }}</h2>
+      </div>
+      <button #detailClose class="icon-button" type="button" (click)="closeRoom()" aria-label="Cerrar detalle de la habitación">
+        <rms-cazo-icon name="close" [size]="18" />
+      </button>
+    </header>
+    <div class="detail-panel__body">
+      <div class="detail-status" [class]="'detail-status detail-status--' + statusTone(room)">
+        <span class="detail-status__label">Estado de la habitación</span>
+        <strong>{{ room.statusName }}</strong>
+        <span class="detail-status__capacity"><rms-cazo-icon name="users" [size]="16" />{{ room.roomTypeName }} · {{ room.capacity }} personas</span>
+      </div>
+
+      @switch (room.statusCode) {
+        @case (0) {
+          <section class="panel-section" aria-labelledby="checkin-title">
+            <header class="panel-section__head">
+              <h3 id="checkin-title">Iniciar servicio</h3>
+              <p>Registra la llegada y abre la cuenta de esta estancia.</p>
+            </header>
+            <div class="modal-field">
+              <span>Tipo de llegada</span>
+              <div class="arrival-toggle" role="radiogroup" aria-label="Tipo de llegada">
+                <label class="arrival-option" [class.is-active]="checkInArrival() === 1">
+                  <input type="radio" name="checkin-arrival" [checked]="checkInArrival() === 1" (change)="checkInArrival.set(1)" />
+                  <rms-cazo-icon name="user" [size]="14" /> A pie
+                </label>
+                <label class="arrival-option" [class.is-active]="checkInArrival() === 2">
+                  <input type="radio" name="checkin-arrival" [checked]="checkInArrival() === 2" (change)="checkInArrival.set(2)" />
+                  <rms-cazo-icon name="tag" [size]="14" /> En vehículo
+                </label>
+              </div>
+            </div>
+            @if (checkInArrival() === 2) {
+              <label class="modal-field">
+                <span>Placa del vehículo</span>
+                <input type="text" maxlength="20" autocomplete="off" placeholder="Ej. M 345-987"
+                  [value]="checkInVehiclePlate()" (input)="checkInVehiclePlate.set($any($event.target).value)" />
+              </label>
+            }
+            <label class="modal-field">
+              <span>Cliente <small>(opcional)</small></span>
+              <input type="text" maxlength="120" autocomplete="off" placeholder="Déjalo vacío para recepción anónima"
+                [value]="checkInCustomerName()" (input)="checkInCustomerName.set($any($event.target).value)" />
+              <em>Un check-in sin nombre queda como anónimo.</em>
+            </label>
+            <label class="modal-field">
+              <span>Tipo de servicio / tarifa</span>
+              <rms-combobox
+                [ngModelOptions]="{ standalone: true }"
+                ariaLabel="Tipo de servicio"
+                [options]="stayTypeOptions()"
+                [clearable]="false"
+                [ngModel]="checkInStayTypeId() === null ? null : checkInStayTypeId()"
+                (ngModelChange)="setStayTypeId($event)" />
+              @if (selectedStayType(); as type) {
+                <em>Salida prevista a {{ type.durationHours }} h · servicio base {{ money(type.price) }} {{ currencyCode() }}</em>
+              }
+            </label>
+            <label class="modal-field">
+              <span>Notas <small>(opcional)</small></span>
+              <input type="text" maxlength="250" placeholder="Preferencias, daños previos…"
+                [value]="checkInNotes()" (input)="checkInNotes.set($any($event.target).value)" />
+            </label>
+            @if (panelError(); as message) { <div class="modal-error" role="alert">{{ message }}</div> }
+            <p class="cash-hint"><rms-cazo-icon name="cash" [size]="14" />{{ cashSessionOpen() ? 'Se asociará a la sesión de caja activa.' : 'No hay caja activa; el servicio se registra sin sesión de caja.' }}</p>
+          </section>
+        }
+        @case (1) {
+          @if (detailLoading()) {
+            <div class="state state--panel" role="status"><span class="spinner"></span><span>Cargando la cuenta…</span></div>
+          } @else if (panelError(); as message) {
+            <div class="state state--panel state--error" role="alert"><span>{{ message }}</span>
+              <button class="secondary-button" type="button" (click)="refreshStayDetail()">Reintentar</button>
+            </div>
+          } @else if (bill(); as bill) {
+            <rms-tabs [tabs]="stayTabs()" [active]="stayTab()" (activeChange)="stayTab.set($event)" idPrefix="stay-tab" ariaLabel="Cuenta de la estancia" />
+            @switch (stayTab()) {
+              @case ('cuenta') {
+                <section class="panel-section">
+                  <dl class="detail-list bill-list">
+                    <div><dt>Servicio base</dt><dd>{{ money(bill.stay.baseServiceCost) }} {{ currencyCode() }} · {{ bill.stay.serviceStayTypeName }}</dd></div>
+                    <div><dt>Horas extra</dt><dd>{{ bill.stay.extendedHours > 0 ? money(bill.stay.extensionCost) + ' ' + currencyCode() : '—' }}</dd></div>
+                    <div><dt>Productos</dt><dd>{{ money(bill.stay.productsTotal) }} {{ currencyCode() }}</dd></div>
+                    <div><dt>Multas</dt><dd>{{ money(bill.stay.finesTotal) }} {{ currencyCode() }}</dd></div>
+                    <div><dt>Pagado</dt><dd>{{ money(bill.stay.paidAmount) }} {{ currencyCode() }}</dd></div>
+                    <div class="bill-list__total"><dt>Saldo por cobrar</dt><dd>{{ money(bill.balance) }} {{ currencyCode() }}</dd></div>
+                  </dl>
+                  <div class="account-block">
+                    <h4>Productos consumidos</h4>
+                    @if (bill.stay.productsTotal > 0 && (stayDetail()?.consumptions?.length ?? 0) > 0) {
+                      <ul class="account-list">
+                        @for (consumption of stayDetail()?.consumptions ?? []; track consumption.consumptionId) {
+                          <li><span>{{ consumption.quantity }} × {{ consumption.productName }}</span><b>{{ money(consumption.subTotal) }} {{ currencyCode() }}</b></li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="account-empty">Sin productos consumidos.</p>
+                    }
+                  </div>
+                  <div class="account-block">
+                    <h4>Extensiones</h4>
+                    @if (stayDetail()?.extensions?.length) {
+                      <ul class="account-list">
+                        @for (extension of stayDetail()?.extensions ?? []; track extension.extensionId) {
+                          <li><span>{{ extension.serviceStayTypeName }} · +{{ extension.extraHours }} h</span><b>{{ money(extension.cost) }} {{ currencyCode() }}</b></li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="account-empty">Sin extensiones registradas.</p>
+                    }
+                  </div>
+                </section>
+              }
+              @case ('extender') {
+                <section class="panel-section">
+                  <header class="panel-section__head"><h3>Extender la estancia</h3><p>Elige la tarifa de horas adicionales; se suma a la cuenta.</p></header>
+                  <label class="modal-field">
+                    <span>Tarifa de extensión</span>
+                    <rms-combobox
+                      [ngModelOptions]="{ standalone: true }"
+                      ariaLabel="Tarifa de extensión"
+                      [options]="extensionOptions()"
+                      [clearable]="false"
+                      [ngModel]="extensionStayTypeId()"
+                      (ngModelChange)="setExtensionStayTypeId($event)" />
+                  </label>
+                  @if (selectedExtensionType(); as type) {
+                    <p class="extension-preview"><rms-cazo-icon name="clock" [size]="14" />+{{ type.durationHours }} h por {{ money(type.price) }} {{ currencyCode() }}</p>
+                  }
+                  @if (panelError(); as message) { <div class="modal-error" role="alert">{{ message }}</div> }
+                  <button class="action-button action-button--primary extension-submit" type="button"
+                    [disabled]="saving() || !canManage() || !selectedExtensionType()" (click)="submitExtension()">
+                    {{ saving() ? 'Extendiendo…' : 'Extender estancia' }}
+                  </button>
+                </section>
+              }
+              @case ('multas') {
+                <section class="panel-section">
+                  <header class="panel-section__head"><h3>Multas y daños</h3><p>Cargas sobre la cuenta por daños u objetos faltantes.</p></header>
+                  @if (stayDetail()?.fines?.length) {
+                    <ul class="account-list fines-list">
+                      @for (fine of stayDetail()?.fines ?? []; track fine.fineId) {
+                        <li [class.is-waived]="fine.isWaived">
+                          <span>
+                            <strong>{{ fine.description }}</strong>
+                            @if (fine.fineTypeName) { <small>{{ fine.fineTypeName }}</small> }
+                            @if (fine.isWaived) { <rms-status-badge tone="neutral">Anulada</rms-status-badge> }
+                          </span>
+                          <b>{{ money(fine.amountInBase) }} {{ currencyCode() }}</b>
+                          @if (!fine.isWaived && canManage()) {
+                            <button class="secondary-button" type="button" [disabled]="saving()" (click)="waiveFine(fine)">Anular</button>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  } @else {
+                    <p class="account-empty">Sin multas registradas.</p>
+                  }
+                  <div class="fine-form">
+                    <label class="modal-field">
+                      <span>Tipo de multa</span>
+                      <rms-combobox
+                        [ngModelOptions]="{ standalone: true }"
+                        ariaLabel="Tipo de multa"
+                        [options]="fineTypeOptions()"
+                        [clearable]="false"
+                        [ngModel]="fineTypeId()"
+                        (ngModelChange)="setFineType($event)" />
+                    </label>
+                    <label class="modal-field">
+                      <span>Descripción / motivo</span>
+                      <input type="text" maxlength="250" placeholder="Ej. Mancha en lencería"
+                        [value]="fineDescription()" (input)="fineDescription.set($any($event.target).value)" />
+                    </label>
+                    <label class="modal-field">
+                      <span>Monto ({{ currencyCode() }})</span>
+                      <input type="number" min="0" step="0.01" [value]="fineAmount() ?? ''" (input)="setFineAmountFromInput($event)" />
+                    </label>
+                    @if (panelError(); as message) { <div class="modal-error" role="alert">{{ message }}</div> }
+                    <button class="action-button action-button--danger fine-submit" type="button"
+                      [disabled]="saving() || !canManage()" (click)="submitFine()">
+                      {{ saving() ? 'Registrando…' : 'Cargar multa a la cuenta' }}
+                    </button>
+                  </div>
+                </section>
+              }
+              @case ('cobro') {
+                <section class="panel-section">
+                  <header class="panel-section__head"><h3>Cobro y salida</h3><p>Liquida el total y libera la habitación.</p></header>
+                  <dl class="detail-list bill-list bill-list--pay">
+                    <div><dt>Total de la cuenta</dt><dd class="is-strong">{{ money(bill.stay.totalAmount) }} {{ currencyCode() }}</dd></div>
+                    <div><dt>Pagado</dt><dd>{{ money(bill.stay.paidAmount) }} {{ currencyCode() }}</dd></div>
+                    <div><dt>Saldo por cobrar</dt><dd>{{ money(bill.balance) }} {{ currencyCode() }}</dd></div>
+                  </dl>
+                  <div class="modal-field">
+                    <span>Método de pago</span>
+                    <div class="arrival-toggle" role="radiogroup" aria-label="Método de pago">
+                      <label class="arrival-option" [class.is-active]="paymentMethod() === 'Efectivo'">
+                        <input type="radio" name="pay-method" [checked]="paymentMethod() === 'Efectivo'" (change)="paymentMethod.set('Efectivo')" />
+                        <rms-cazo-icon name="cash" [size]="14" /> Efectivo
+                      </label>
+                      <label class="arrival-option" [class.is-active]="paymentMethod() === 'Tarjeta'">
+                        <input type="radio" name="pay-method" [checked]="paymentMethod() === 'Tarjeta'" (change)="paymentMethod.set('Tarjeta')" />
+                        <rms-cazo-icon name="card" [size]="14" /> Tarjeta
+                      </label>
+                    </div>
+                  </div>
+                  <label class="modal-field">
+                    <span>Monto pagado ({{ currencyCode() }})</span>
+                    <input type="number" min="0" step="0.01"
+                      [value]="paidAmountInput() ?? ''" (input)="setPaidAmountFromInput($event)" />
+                  </label>
+                  @if (changeDue(); as change) {
+                    <p class="change-line"><span>Cambio a entregar</span><strong>{{ money(change) }} {{ currencyCode() }}</strong></p>
+                  }
+                  @if (panelError(); as message) { <div class="modal-error" role="alert">{{ message }}</div> }
+                  <p class="cash-hint"><rms-cazo-icon name="cash" [size]="14" />{{ cashSessionOpen() ? 'El cobro se registrará en la caja activa.' : 'Sin caja activa: el cobro no se ligará a un turno.' }}</p>
+                  <button class="action-button action-button--primary checkout-submit" type="button"
+                    [disabled]="saving() || !canManage() || !room.currentRoomStayId || (paidAmountInput() ?? 0) <= 0"
+                    (click)="submitCheckout()">
+                    {{ saving() ? 'Procesando…' : 'Cobrar y check-out' }}
+                  </button>
+                </section>
+              }
+            }
+          } @else {
+            <div class="state state--panel"><span>No pudimos leer la cuenta de esta estancia.</span>
+              <button class="secondary-button" type="button" (click)="refreshStayDetail()">Reintentar</button>
+            </div>
+          }
+        }
+        @case (2) {
+          <section class="panel-section">
+            <p class="cleaning-copy"><rms-cazo-icon name="sparkles" [size]="15" />La habitación está en proceso de limpieza y desinfección. Termínala para volver a ofertarla.</p>
+            @if (panelError(); as message) { <div class="modal-error" role="alert">{{ message }}</div> }
+          </section>
+        }
+        @default {
+          <section class="panel-section">
+            <p class="cleaning-copy">
+              @if (room.statusCode === 3) { <rms-cazo-icon name="lock" [size]="15" />Habitación en mantenimiento: no admite check-in hasta que se libere. }
+              @else { <rms-cazo-icon name="calendar" [size]="15" />Habitación reservada: espera la llegada del cliente o el registro del servicio. }
+            </p>
+          </section>
+        }
+      }
+
+      @if (room.customerName && room.statusCode === 1 && bill()) {
+        <dl class="detail-list">
+          <div><dt>Cliente</dt><dd>{{ room.customerName }}</dd></div>
+          <div><dt>Llegada</dt><dd>{{ room.arrivalTypeName || 'A pie' }}{{ room.vehiclePlate ? ' · Placa ' + room.vehiclePlate : '' }}</dd></div>
+          <div><dt>Entrada</dt><dd>{{ instant(room.startTimeUtc) }}</dd></div>
+          <div><dt>Salida prevista</dt><dd>{{ instant(room.expectedEndTimeUtc) }}</dd></div>
+          <div><dt>Tiempo transcurrido</dt><dd>{{ elapsed(room.elapsedMinutes) }}</dd></div>
+        </dl>
+      } @else if (room.customerName) {
+        <dl class="detail-list">
+          <div><dt>Cliente</dt><dd>{{ room.customerName }}</dd></div>
+          @if (room.vehiclePlate) { <div><dt>Placa</dt><dd>{{ room.vehiclePlate }}</dd></div> }
+        </dl>
+      }
+    </div>
+    <footer class="detail-actions" aria-label="Acciones de la habitación">
+      @switch (room.statusCode) {
+        @case (0) {
+          <button class="action-button action-button--primary detail-actions__main" type="button"
+            [disabled]="saving() || !canManage()" (click)="submitCheckIn()">
+            {{ saving() ? 'Iniciando…' : 'Iniciar (check-in)' }}
+          </button>
+        }
+        @case (1) {
+          <button class="action-button action-button--primary detail-actions__main" type="button"
+            (click)="stayTab.set('cobro')" [disabled]="!bill()">
+            <rms-cazo-icon name="wallet" [size]="16" />Ir a cobro
+          </button>
+          <div class="detail-actions__secondary">
+            <button class="action-button action-button--subtle" type="button" (click)="refreshStayDetail()" [disabled]="detailLoading()">Refrescar cuenta</button>
+            <button class="action-button action-button--subtle" type="button" (click)="stayTab.set('extender')" [disabled]="!canManage() || saving()">Extender horas</button>
+          </div>
+        }
+        @case (2) {
+          <button class="action-button action-button--primary detail-actions__main" type="button"
+            [disabled]="saving() || !canManage()" (click)="finishCleaning()">
+            {{ saving() ? 'Guardando…' : 'Terminar limpieza' }}
+          </button>
+        }
+        @default {
+          <span class="detail-actions__note">Esta habitación no admite acciones desde el POS en su estado actual.</span>
+        }
+      }
+    </footer>
+  </aside>
+}

@@ -1,0 +1,117 @@
+<rms-form-page title="Registrar movimiento" eyebrow="INVENTARIO"
+  subtitle="Compra de entrada, venta, merma o ajuste: corrije el kardex con su motivo. Cada movimiento queda documentado con el saldo antes y después."
+  [backLink]="backLink" backLabel="Volver" [steps]="steps" [current]="step()" [maxReached]="reached()"
+  [busy]="saving()" withAside [status]="form.dirty ? 'Cambios sin guardar' : null" (stepSelect)="goTo($event)">
+
+  @if (!network.online()) {
+    <rms-notice tone="offline" title="Sin conexión">Necesitas conexión para registrar el movimiento.</rms-notice>
+  }
+  @if (!canRecord()) {
+    <rms-notice tone="danger" title="No tienes permiso para registrar movimientos">Pídele a quien administra tu negocio que habilite el permiso de inventario.</rms-notice>
+  }
+  @if (error(); as message) {
+    <rms-notice tone="danger" title="No se pudo continuar" dismissible (dismissed)="error.set(null)">{{ message }}</rms-notice>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="save()" class="movement-stack" novalidate>
+    @if (loading()) {
+      <span class="rms-skeleton rms-skeleton--block" aria-busy="true"></span>
+    } @else if (step() === 0) {
+      <rms-panel title="¿Qué producto?" subtitle="El movimiento mueve el stock del minibar de tus habitaciones.">
+        <div class="rms-form-grid">
+          <rms-field label="Producto" required span="full">
+            <rms-combobox formControlName="productId" [loader]="searchProducts" [selectedOptions]="selectedProductOption()" placeholder="Busca un producto por nombre…"
+              emptyText="No encontramos productos activos con ese nombre" ariaLabel="Producto a mover" (optionSelected)="productPicked($event)" />
+          </rms-field>
+        </div>
+        @if (loadingProduct()) {
+          <p class="rms-muted movement-note" role="status">Consultando existencias…</p>
+        } @else if (product(); as p) {
+          <div class="movement-stock">
+            <div class="movement-stock__total">
+              <small>Hay en existencia</small>
+              <strong>{{ stockBefore() | number:'1.0-2' }} <span>{{ p.unitOfMeasure }}</span></strong>
+            </div>
+            <div class="movement-stock__meta">
+              <small>Precio de venta</small>
+              <span>C$ {{ p.salePrice | number:'1.2-2' }}</span>
+              <small>Costo actual</small>
+              <span>C$ {{ p.costPrice | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        }
+      </rms-panel>
+
+      <rms-panel title="¿Qué haces con la existencia?">
+        <div class="movement-choice" role="radiogroup" aria-label="Tipo de movimiento">
+          @for (item of movementTypes; track item.type) {
+            <button type="button" role="radio" [attr.aria-checked]="typeId() === item.type" [class.is-selected]="typeId() === item.type" [class.is-out]="item.sign < 0" (click)="chooseType(item.type)">
+              <span class="movement-choice__sign" aria-hidden="true">{{ item.sign < 0 ? '−' : '+' }}</span>
+              <span><strong>{{ typeLabel(item.type) }}</strong><small>{{ item.sign < 0 ? 'Resta del inventario' : 'Suma al inventario' }}</small></span>
+            </button>
+          }
+        </div>
+      </rms-panel>
+
+      <rms-panel title="¿Cuánto mueves?">
+        <div class="rms-form-grid">
+          <rms-field label="Cantidad" required [error]="quantityError()" [hint]="unit() ? 'En ' + unit() : null">
+            <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="quantity" aria-label="Cantidad del movimiento" />
+          </rms-field>
+        </div>
+      </rms-panel>
+    } @else {
+      <rms-panel title="¿Por qué mueves el inventario?" subtitle="El motivo queda en la bitácora del kardex.">
+        <div class="movement-reasons" role="group" aria-label="Motivos frecuentes">
+          @for (item of reasons; track item) {
+            <button type="button" class="movement-chip" [class.is-selected]="reason() === item" [attr.aria-pressed]="reason() === item" (click)="chooseReason(item)">{{ item }}</button>
+          }
+        </div>
+        <div class="rms-form-grid">
+          <rms-field [label]="reason() ? 'Detalle' : 'Cuéntalo en una frase'" [optional]="!!reason()" span="full" [error]="reasonError()">
+            <input class="rms-input" formControlName="detail" maxlength="200" aria-label="Detalle del motivo" placeholder="Ej. Conteo del turno de la noche" />
+          </rms-field>
+          <rms-field label="Documento de referencia" optional hint="Factura, nota o número de documento que respalda el movimiento.">
+            <input class="rms-input" formControlName="referenceDoc" maxlength="100" aria-label="Documento de referencia" placeholder="Ej. FC-001-0000001-001" />
+          </rms-field>
+        </div>
+      </rms-panel>
+
+      <rms-panel title="Costo del movimiento" subtitle="Se usa para estimar lo que el movimiento cuesta al motel.">
+        <div class="rms-form-grid">
+          <rms-field label="Costo por unidad" optional [hint]="'Deja vacío para usar el costo actual del producto (' + (product()?.costPrice ?? 0 | number:'1.2-2') + ' C$).'">
+            <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="unitCost" aria-label="Costo por unidad" placeholder="Ej. 42.50" />
+          </rms-field>
+        </div>
+      </rms-panel>
+    }
+  </form>
+
+  <aside aside>
+    <rms-panel title="Resumen del movimiento" raised>
+      <ul class="movement-summary">
+        <li><span>Producto</span><strong>{{ product()?.name || '—' }}</strong></li>
+        <li><span>Operación</span><strong>{{ typeId() ? typeLabel(typeId()!) : '—' }}</strong></li>
+        <li><span>Motivo</span><strong>{{ reasonText() || '—' }}</strong></li>
+      </ul>
+      <div class="movement-delta" aria-live="polite">
+        <div><small>Antes</small><strong>{{ stockBefore() === null ? '—' : (stockBefore() | number:'1.0-2') }}</strong></div>
+        <div class="movement-delta__op" [class.is-out]="!isEntry()"><small>Movimiento</small><strong>{{ quantity() > 0 && selectedType() ? ((isEntry() ? '+' : '−') + (quantity() | number:'1.0-2')) : '—' }}</strong></div>
+        <div><small>Después</small><strong>{{ after() === null ? '—' : (after() | number:'1.0-2') }}</strong></div>
+      </div>
+      @if (unit()) { <p class="rms-muted movement-note">Medido en {{ unit() }}.</p> }
+    </rms-panel>
+  </aside>
+
+  <ng-container footer>
+    <a class="rms-btn rms-btn--ghost" [routerLink]="backLink">Cancelar</a>
+    @if (step() === 0) {
+      <button type="button" class="rms-btn rms-btn--primary" (click)="next()" [disabled]="loading() || loadingProduct() || !canRecord()">Continuar <rms-cazo-icon name="arrow-right" [size]="16" /></button>
+    } @else {
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="back()">Atrás</button>
+      <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online() || !canRecord()" (click)="save()">
+        @if (saving()) { <span class="rms-spinner"></span> Registrando… } @else { <rms-cazo-icon name="check" [size]="16" /> Registrar movimiento }
+      </button>
+    }
+  </ng-container>
+</rms-form-page>

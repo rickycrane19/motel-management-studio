@@ -1,0 +1,102 @@
+@if (loading()) {
+  <section class="rms-page employee-form-loading" aria-busy="true">
+    <span class="rms-skeleton rms-skeleton--title"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+    <span class="rms-skeleton rms-skeleton--block"></span>
+  </section>
+} @else if (loadError(); as message) {
+  <section class="rms-page">
+    <rms-empty-state kind="error" title="No pudimos abrir la ficha" [description]="message">
+      <button type="button" class="rms-btn rms-btn--secondary" (click)="loadProfile(employeeId!)">Reintentar</button>
+      <a class="rms-btn rms-btn--ghost" routerLink="/admin/employees">Volver a empleados</a>
+    </rms-empty-state>
+  </section>
+} @else {
+  <rms-form-page
+    [title]="isEdit ? 'Editar ficha del empleado' : 'Nuevo empleado'" eyebrow="RECURSOS HUMANOS"
+    [subtitle]="isEdit ? 'Corrige los datos de la persona o cómo se le paga. Los pagos ya registrados no cambian.' : 'En dos pasos queda registrado: quién es y cómo se le paga.'"
+    [backLink]="backLink" backLabel="Volver" [steps]="steps()" [current]="step()" [maxReached]="reached()" [busy]="saving()"
+    [status]="dirty() ? 'Cambios sin guardar' : null" withAside (stepSelect)="goTo($event)">
+
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes revisar el formulario, pero necesitas conexión para guardarlo.</rms-notice>
+    }
+    @if (saveError(); as message) {
+      <rms-notice tone="danger" title="No se pudo guardar" dismissible (dismissed)="saveError.set(null)">{{ message }}</rms-notice>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" class="employee-stack" novalidate>
+      @switch (step()) {
+        @case (0) {
+          <rms-panel title="¿Quién es?" subtitle="Datos de la persona tal como aparecen en su documento.">
+            <div class="rms-form-grid">
+              <rms-field label="Nombre completo" required [error]="error('fullName')">
+                <input class="rms-input" formControlName="fullName" maxlength="60" autocomplete="off" placeholder="Ej. María Fernanda López Silva" />
+              </rms-field>
+              <rms-field label="Teléfono" optional hint="Sirve para avisar turnos y novedades.">
+                <input class="rms-input" formControlName="phone" maxlength="20" autocomplete="off" inputmode="tel" placeholder="Ej. 8888-0000" />
+              </rms-field>
+            </div>
+          </rms-panel>
+        }
+        @case (1) {
+          <rms-panel title="¿En qué trabaja?" subtitle="El puesto se describe con texto libre en el motel.">
+            <div class="rms-form-grid">
+              <rms-field label="Puesto" required [error]="error('position')">
+                <input class="rms-input" formControlName="position" maxlength="50" autocomplete="off" placeholder="Ej. Recepción de noche" />
+              </rms-field>
+            </div>
+          </rms-panel>
+
+          <rms-panel title="¿Cómo se le paga?" subtitle="La modalidad define cómo se calculan sus pagos en la nómina simple.">
+            <div class="employee-choice" role="radiogroup" aria-label="Modalidad de pago">
+              @for (option of paymentTypes; track option.value) {
+                <button type="button" role="radio" [attr.aria-checked]="paymentTypeValue() === option.value"
+                  [class.is-selected]="paymentTypeValue() === option.value" (click)="form.controls.paymentType.setValue(option.value)">
+                  <strong>{{ option.label }}</strong><small>{{ option.hint }}</small>
+                </button>
+              }
+            </div>
+            <div class="rms-form-grid">
+              <rms-field label="Salario o tarifa por periodo" required [error]="rateError()">
+                <input class="rms-input" type="number" inputmode="decimal" min="0" step="0.01" formControlName="rate" placeholder="0.00" />
+              </rms-field>
+              <rms-field label="Comisión sobre ventas (%)" optional [error]="commissionError()"
+                hint="Porcentaje de sus ventas cobradas que se le paga. Deja 0 si no recibe comisión.">
+                <input class="rms-input" type="number" inputmode="decimal" min="0" max="100" step="0.01" formControlName="commissionRatePercent" placeholder="0.00" />
+              </rms-field>
+              <rms-field label="Moneda">
+                <rms-combobox formControlName="currencyCode" [options]="currencies" [clearable]="false" ariaLabel="Moneda" />
+              </rms-field>
+            </div>
+          </rms-panel>
+        }
+      }
+    </form>
+
+    <aside aside>
+      <rms-panel title="Resumen" raised>
+        <ul class="employee-summary">
+          <li><span>Nombre</span><strong>{{ summary().name || '—' }}</strong></li>
+          <li><span>Teléfono</span><strong>{{ summary().phone || '—' }}</strong></li>
+          <li><span>Puesto</span><strong>{{ summary().position || '—' }}</strong></li>
+          <li><span>Modalidad</span><strong>{{ summary().paymentType }}</strong></li>
+          <li><span>Salario / tarifa</span><strong class="num">{{ summary().currency }} {{ summary().rate | number:'1.2-2' }}</strong></li>
+          <li><span>Comisión sobre ventas</span><strong class="num">{{ summary().commissionRatePercent | number:'1.0-2' }} %</strong></li>
+        </ul>
+      </rms-panel>
+    </aside>
+
+    <ng-container footer>
+      <button type="button" class="rms-btn rms-btn--ghost" (click)="cancel()">Cancelar</button>
+      @if (step() > 0) { <button type="button" class="rms-btn rms-btn--secondary" (click)="previous()">Atrás</button> }
+      @if (step() < lastStep()) {
+        <button type="button" class="rms-btn rms-btn--primary" (click)="next()">Continuar <rms-cazo-icon name="arrow-right" [size]="16" /></button>
+      } @else {
+        <button type="button" class="rms-btn rms-btn--primary" [disabled]="saving() || !network.online()" (click)="save()">
+          @if (saving()) { <span class="rms-spinner"></span> Guardando… } @else { <rms-cazo-icon name="check" [size]="16" /> {{ isEdit ? 'Guardar cambios' : 'Registrar empleado' }} }
+        </button>
+      }
+    </ng-container>
+  </rms-form-page>
+}

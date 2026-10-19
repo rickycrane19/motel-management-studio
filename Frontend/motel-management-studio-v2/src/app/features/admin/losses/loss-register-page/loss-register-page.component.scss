@@ -1,0 +1,27 @@
+:host { display: block; }
+.loss-form { display: grid; gap: 16px; }
+
+// Selección de categoría (mismo patrón que los movimientos de inventario).
+.loss-choice {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px;
+  button {
+    min-height: 68px; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--cazo-line-strong);
+    border-radius: var(--cazo-radius-md); background: var(--cazo-surface); color: var(--cazo-ink); text-align: left; cursor: pointer;
+    transition: border-color .16s var(--cazo-ease), background-color .16s var(--cazo-ease);
+    span { min-width: 0; display: grid; gap: 2px; }
+    strong { font-size: 14px; font-weight: 650; }
+    small { color: var(--cazo-muted); font-size: 12px; line-height: 1.35; }
+    &:hover { border-color: var(--cazo-brand); background: var(--cazo-soft); }
+    &.is-selected { border-color: var(--cazo-brand); background: var(--cazo-brand-soft); }
+    &:focus-visible { outline: 0; box-shadow: var(--cazo-focus-ring); }
+  }
+}
+
+.loss-note { margin: 10px 0 0; font-size: 13px; line-height: 1.45; }
+
+.loss-summary {
+  display: grid; gap: 12px; margin: 0; padding: 0; list-style: none;
+  li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  span { color: var(--cazo-muted); font-size: 12px; font-weight: 600; }
+  strong { font-size: 14px; font-weight: 650; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+}

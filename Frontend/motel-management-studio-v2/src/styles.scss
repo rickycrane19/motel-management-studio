@@ -1,0 +1,111 @@
+@use './styles/controls';
+@use './styles/ui';
+@use './styles/product-form';
+@use './styles/products-page';
+@use './styles/pos-payment-modal';
+@use './app/shared/print/print-report';
+
+/*
+ * Tokens de El Rapidin V2. Paleta única celeste / blanco / negro.
+ *
+ * El diseño rms (restaurant v2) usa tokens `--cazo-*`; aquí cada token
+ * apunta al mismo valor con la paleta del motel, de modo que las vistas
+ * portadas se ven literalmente iguales, solo cambia la paleta.
+ */
+:root {
+  /* ── Tokens del motel (paleta celeste/blanco/negro) ── */
+  --motel-bg: #f0f7ff;
+  --motel-surface: #f0f7ff;
+  --motel-surface-raised: #e0f2fe;
+  --motel-surface-sunken: #dbeafe;
+  --motel-soft: #e0f2fe;
+  --motel-ink: #0f172a;
+  --motel-ink-soft: #1e293b;
+  --motel-muted: #64748b;
+  --motel-brand: #0284c7;
+  --motel-brand-strong: #0369a1;
+  --motel-brand-soft: #e0f2fe;
+  --motel-primary: var(--motel-brand);
+  --motel-on-dark: #f0f7ff;
+  --motel-line: #cbd5e1;
+  --motel-line-strong: #94a3b8;
+  --motel-success: #059669;
+  --motel-success-soft: #d1fae5;
+  --motel-warning: #d97706;
+  --motel-warning-soft: #fef3c7;
+  --motel-danger: #dc2626;
+  --motel-danger-soft: #fee2e2;
+  --motel-info: #0284c7;
+  --motel-info-soft: #e0f2fe;
+
+  /* ── Alias cazo (los parciales rms del diseño resuelven con la paleta del motel) ── */
+  --cazo-bg: #f0f7ff;
+  --cazo-surface: #f0f7ff;
+  --cazo-surface-raised: #e0f2fe;
+  --cazo-surface-sunken: #dbeafe;
+  --cazo-soft: #e0f2fe;
+  --cazo-ink: #0f172a;
+  --cazo-ink-soft: #1e293b;
+  --cazo-muted: #64748b;
+  --cazo-brand: #0284c7;
+  --cazo-brand-strong: #0369a1;
+  --cazo-brand-soft: #e0f2fe;
+  --cazo-primary: var(--cazo-brand);
+  --cazo-on-dark: #f0f7ff;
+  --cazo-line: #cbd5e1;
+  --cazo-line-strong: #94a3b8;
+  --cazo-success: #059669;
+  --cazo-success-soft: #d1fae5;
+  --cazo-warning: #d97706;
+  --cazo-warning-soft: #fef3c7;
+  --cazo-danger: #dc2626;
+  --cazo-danger-soft: #fee2e2;
+  --cazo-info: #0284c7;
+  --cazo-info-soft: #e0f2fe;
+  --cazo-radius-sm: 8px;
+  --cazo-radius-md: 12px;
+  --cazo-radius-lg: 16px;
+  --cazo-radius-xl: 24px;
+  --cazo-shadow-sm: 0 2px 6px rgb(15 23 42 / 6%);
+  --cazo-shadow-md: 0 12px 28px rgb(15 23 42 / 9%);
+  --cazo-shadow-raised: 0 22px 48px rgb(15 23 42 / 18%), 0 3px 10px rgb(15 23 42 / 8%);
+  --cazo-focus-ring: 0 0 0 3px rgb(2 132 199 / 30%);
+  --cazo-font-display: "Outfit Variable", Outfit, "Segoe UI", sans-serif;
+  --cazo-font-body: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cazo-ease: cubic-bezier(.2, .7, .2, 1);
+  color: var(--cazo-ink);
+  background: var(--cazo-bg);
+  font-family: var(--cazo-font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  color-scheme: light;
+  scrollbar-color: #93c5fd transparent;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; }
+body { background: var(--cazo-bg); }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+:where(:focus-visible) { outline: 3px solid #38bdf8; outline-offset: 2px; }
+::selection { color: var(--cazo-ink); background: rgb(2 132 199 / 22%); }
+h1, h2, h3 { font-family: var(--cazo-font-display); }
+
+/* Superficie de confirmación heredada (las vistas nuevas usan ConfirmDialogService). */
+.modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgb(15 23 42 / 42%); }
+.confirm-modal { position: fixed; z-index: 110; top: 50%; left: 50%; width: min(420px, calc(100vw - 28px)); padding: 24px; border: 1px solid var(--cazo-line); border-radius: 18px; color: var(--cazo-ink); background: var(--cazo-surface-raised); box-shadow: var(--cazo-shadow-raised); text-align: center; transform: translate(-50%, -50%); }
+.confirm-modal__icon { width: 40px; height: 40px; display: grid; place-items: center; margin: 0 auto 12px; border-radius: 50%; color: var(--cazo-danger); background: var(--cazo-danger-soft); font-weight: 900; }
+.confirm-modal h2 { margin: 0; font-size: 19px; }.confirm-modal p { margin: 8px 0 20px; color: var(--cazo-muted); font-size: 13px; line-height: 1.5; }.confirm-modal > div { display: flex; justify-content: center; gap: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+@media print {
+  body:has(.rms-print-doc) .layout > rms-backoffice-sidebar,
+  body:has(.rms-print-doc) .layout__body > rms-backoffice-header { display: none !important; }
+  body:has(.rms-print-doc) .layout { display: block; min-height: 0; }
+  body:has(.rms-print-doc) .layout__content { padding: 0; overflow: visible; }
+  html:has(.rms-print-doc), body:has(.rms-print-doc) { background: #fff; }
+  .rms-print-doc, .rms-print-doc * { box-shadow: none !important; }
+  .rms-print-doc { max-width: 190mm; margin: 0 auto; }
+}

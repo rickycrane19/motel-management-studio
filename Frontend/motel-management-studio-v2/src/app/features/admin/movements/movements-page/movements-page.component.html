@@ -1,0 +1,80 @@
+<section class="rms-page movements-stack">
+  <rms-page-header eyebrow="INVENTARIO" title="Movimientos de inventario"
+    subtitle="Todo lo que entra, sale o se ajusta en el kardex del motel, con cuándo fue y por qué.">
+    <ng-container actions>
+      <a class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Registrar movimiento</a>
+    </ng-container>
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-notice tone="danger" title="Sin permiso de inventario">Tu rol no puede consultar los movimientos del kardex. Pídelo a quien administra tu negocio.</rms-notice>
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes consultar lo que ya cargó. Para registrar un movimiento necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de movimientos">
+      <rms-stat-card label="Movimientos" [value]="store.stats().total" hint="En las fechas elegidas" icon="swap" tone="brand" [loading]="store.status() === 'loading' && store.movements().length === 0" />
+      <rms-stat-card label="Entradas" [value]="store.stats().entries" hint="Sumando al inventario" icon="download" [loading]="store.status() === 'loading' && store.movements().length === 0" />
+      <rms-stat-card label="Salidas" [value]="store.stats().exits" hint="Restando del inventario" icon="arrow-right" [loading]="store.status() === 'loading' && store.movements().length === 0" />
+    </div>
+
+    <rms-filter-bar [placeholder]="'Buscar por producto, motivo o documento…'" [search]="store.query().search" [activeCount]="store.activeFilterCount()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <label filters class="movements-date"><span class="rms-sr-only">Desde</span>
+        <rms-date-field [formControl]="startControl" ariaLabel="Desde" [max]="endControl.value || null" />
+      </label>
+      <label filters class="movements-date"><span class="rms-sr-only">Hasta</span>
+        <rms-date-field [formControl]="endControl" ariaLabel="Hasta" [min]="startControl.value || null" />
+      </label>
+      <rms-combobox filters [options]="typeOptions" [formControl]="typeControl" placeholder="Todos los tipos" emptyText="No hay tipos con ese nombre" ariaLabel="Filtrar por tipo de movimiento" />
+    </rms-filter-bar>
+
+    <rms-data-table [columns]="columns" [rows]="store.movements()" [loading]="store.status() === 'loading'" [error]="store.errorMessage()" errorTitle="No pudimos cargar los movimientos"
+      caption="Bitácora de movimientos del kardex" [trackBy]="trackMovement" [rowClickable]="true" (rowClick)="open($event)" (retry)="store.load(store.query())"
+      emptyTitle="No hay movimientos en esas fechas" emptyDescription="Cambia el rango de fechas, limpia los filtros o registra un movimiento.">
+      <ng-template rmsCell="when" let-row>
+        <span class="movements-cell"><strong>{{ row.createdOnUtc | date:'d MMM y':'America/Managua' }}</strong><small>{{ row.createdOnUtc | date:'h:mm a':'America/Managua' }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="product" let-row>
+        <span class="movements-cell movements-cell--wrap"><strong>{{ row.productName }}</strong><small>{{ row.productCode }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="type" let-row>
+        <span class="movements-cell movements-cell--wrap">
+          <span><rms-status-badge [tone]="movementSign(row.movementType) < 0 ? 'warning' : 'success'" [dot]="false">{{ movementSign(row.movementType) < 0 ? 'Salida' : 'Entrada' }}</rms-status-badge> {{ typeLabel(row.movementType) }}</span>
+          @if (row.reason) { <small>{{ row.reason }}</small> }
+        </span>
+      </ng-template>
+      <ng-template rmsCell="quantity" let-row>
+        <span class="movements-cell movements-cell--num"><strong [class.is-out]="movementSign(row.movementType) < 0">{{ movementSign(row.movementType) < 0 ? '−' : '+' }}{{ row.quantity | number:'1.0-2' }}</strong><small>{{ unitOf(row.productId) }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="balance" let-row>
+        <span class="movements-cell movements-cell--num"><strong>{{ row.newStock | number:'1.0-2' }}</strong><small>Antes: {{ row.previousStock | number:'1.0-2' }}</small></span>
+      </ng-template>
+      <ng-template rmsCell="cost" let-row>
+        <span class="movements-cell movements-cell--num"><strong>C$ {{ row.totalCost | number:'1.2-2' }}</strong><small>C$ {{ row.unitCost | number:'1.2-2' }} c/u</small></span>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+        label="movimientos" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="store.applyFilters({ pageSize: $event, pageNumber: 1 })" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.productName ?? 'Movimiento'" eyebrow="Detalle del movimiento" (closed)="closeDetail()">
+  @if (selected(); as movement) {
+    <div class="movements-detail">
+      <rms-status-badge [tone]="movementSign(movement.movementType) < 0 ? 'warning' : 'success'" [dot]="false">{{ movementSign(movement.movementType) < 0 ? 'Salida de inventario' : 'Entrada de inventario' }}</rms-status-badge>
+      <dl class="movements-detail__list">
+        <div><dt>Producto</dt><dd>{{ movement.productName }} <small>({{ movement.productCode }})</small></dd></div>
+        <div><dt>Tipo</dt><dd>{{ typeLabel(movement.movementType) }}</dd></div>
+        <div><dt>Cantidad</dt><dd>{{ movementSign(movement.movementType) < 0 ? '−' : '+' }}{{ movement.quantity | number:'1.0-2' }} {{ unitOf(movement.productId) }}</dd></div>
+        <div><dt>Saldo</dt><dd>{{ movement.previousStock | number:'1.0-2' }} → {{ movement.newStock | number:'1.0-2' }}</dd></div>
+        <div><dt>Costo unitario</dt><dd>C$ {{ movement.unitCost | number:'1.2-2' }}</dd></div>
+        <div><dt>Costo total</dt><dd>C$ {{ movement.totalCost | number:'1.2-2' }}</dd></div>
+        <div><dt>Motivo</dt><dd>{{ movement.reason || 'Sin motivo registrado' }}</dd></div>
+        <div><dt>Documento de referencia</dt><dd>{{ movement.referenceDoc || '—' }}</dd></div>
+        @if (movement.roomStayId) { <div><dt>Estancia</dt><dd>No. {{ movement.roomStayId }}</dd></div> }
+        <div><dt>Cuándo</dt><dd>{{ movement.createdOnUtc | date:'d MMM y, h:mm a':'America/Managua' }}</dd></div>
+      </dl>
+    </div>
+  }
+</rms-drawer>

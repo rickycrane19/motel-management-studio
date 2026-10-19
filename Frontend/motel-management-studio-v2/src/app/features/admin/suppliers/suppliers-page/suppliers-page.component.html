@@ -1,0 +1,123 @@
+<section class="rms-page suppliers-page">
+  <rms-page-header
+    title="Proveedores"
+    eyebrow="INVENTARIO"
+    subtitle="El maestro de proveedores del motel: a quién le compras y a quién le devuelves, con sus datos de contacto.">
+    @if (canCreate()) {
+      <a actions class="rms-btn rms-btn--primary" routerLink="nuevo" [class.is-disabled]="!network.online()"><rms-cazo-icon name="plus" [size]="18" /> Nuevo proveedor</a>
+    }
+  </rms-page-header>
+
+  @if (!canView()) {
+    <rms-empty-state kind="forbidden" title="Sin permiso de inventario" description="Tu rol no puede ver el maestro de proveedores. Pídele a quien administra tu negocio el permiso de inventario." />
+  } @else {
+    @if (!network.online()) {
+      <rms-notice tone="offline" title="Sin conexión">Puedes ver los proveedores que ya cargaron. Para crear o cambiar proveedores necesitas conexión.</rms-notice>
+    }
+
+    <div class="rms-stats" aria-label="Resumen de proveedores">
+      <rms-stat-card label="Proveedores" [value]="store.stats().total" hint="En el maestro" icon="truck" tone="brand" [loading]="store.status() === 'loading' && store.suppliers().length === 0" />
+      <rms-stat-card label="Activos" [value]="store.stats().active" hint="Disponibles al comprar" icon="check" [loading]="store.status() === 'loading' && store.suppliers().length === 0" />
+      <rms-stat-card label="Con compras" [value]="store.stats().withPurchases" hint="Ya tienen historial" icon="orders" [loading]="store.status() === 'loading' && store.suppliers().length === 0" />
+    </div>
+
+    <rms-filter-bar placeholder="Buscar proveedor por nombre, contacto, teléfono o RUC…" [search]="store.query().search" [activeCount]="activeFilters()" (searchChange)="onSearch($event)" (cleared)="clearFilters()">
+      <rms-combobox filters class="filter-status" [options]="statusOptions" [formControl]="statusControl" [clearable]="false" ariaLabel="Filtrar por estado" />
+    </rms-filter-bar>
+
+    <rms-data-table
+      [columns]="columns()"
+      [rows]="store.suppliers()"
+      [loading]="store.status() === 'loading'"
+      [error]="tableError()"
+      errorTitle="No pudimos cargar los proveedores"
+      [trackBy]="trackSupplier"
+      [rowClickable]="true"
+      (rowClick)="open($event)"
+      (retry)="store.load(store.query())"
+      emptyTitle="Aún no tienes proveedores"
+      emptyDescription="Crea el primero para poder seleccionarlo al registrar compras y devoluciones."
+      caption="Maestro de proveedores del motel">
+      <ng-template rmsCell="name" let-row>
+        <span class="cell-main"><strong>{{ row.name }}</strong></span>
+        <small>ID {{ row.supplierId }}</small>
+      </ng-template>
+      <ng-template rmsCell="contact" let-row>
+        <span class="cell-sub">{{ contactLine(row) }}</span>
+        @if (row.phone) { <small>{{ row.phone }}</small> }
+      </ng-template>
+      <ng-template rmsCell="purchases" let-row>
+        <span class="cell-main"><strong>{{ row.purchasesCount }}</strong></span>
+        <small>{{ row.lastPurchaseManagua ? 'Última: ' + when(row.lastPurchaseManagua) : 'Sin compras' }}</small>
+      </ng-template>
+      <ng-template rmsCell="createdOn" let-row>
+        <span class="cell-sub">{{ when(row.createdOnManagua) }}</span>
+      </ng-template>
+      <ng-template rmsCell="status" let-row>
+        <rms-status-badge [tone]="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? 'Activo' : 'Desactivado' }}</rms-status-badge>
+      </ng-template>
+      <ng-template rmsCell="actions" let-row>
+        <div class="row-actions" (click)="$event.stopPropagation()">
+          @if (canUpdate()) {
+            <a class="rms-btn rms-btn--secondary rms-btn--sm" [routerLink]="[row.supplierId, 'editar']" [attr.aria-label]="'Editar ' + row.name"><rms-cazo-icon name="edit" [size]="15" /> Editar</a>
+            <button type="button" class="rms-btn rms-btn--ghost rms-btn--sm" [disabled]="!network.online() || store.busySupplierId() === row.supplierId" (click)="toggleStatus(row)" [attr.aria-label]="(row.isActive ? 'Desactivar ' : 'Activar ') + row.name">
+              <rms-cazo-icon [name]="row.isActive ? 'eye-off' : 'eye'" [size]="15" /> {{ row.isActive ? 'Desactivar' : 'Activar' }}
+            </button>
+          }
+        </div>
+      </ng-template>
+      <rms-pager [page]="store.query().pageNumber" [pageSize]="store.query().pageSize" [total]="store.totalRecords()" [loading]="store.status() === 'loading'"
+        label="proveedores" [pageSizeOptions]="pageSizes" (pageChange)="store.goToPage($event)" (pageSizeChange)="setPageSize($event)" />
+    </rms-data-table>
+  }
+</section>
+
+<rms-drawer [open]="!!selected()" [title]="selected()?.name ?? 'Proveedor'" [subtitle]="selected()?.contactName ?? null" eyebrow="Detalle del proveedor" (closed)="closeDetail()">
+  @if (selected(); as supplier) {
+    <ng-container>
+    <div class="detail">
+      <div class="detail__badges">
+        <rms-status-badge [tone]="supplier.isActive ? 'success' : 'neutral'">{{ supplier.isActive ? 'Activo' : 'Desactivado' }}</rms-status-badge>
+        <rms-status-badge [tone]="supplier.purchasesCount > 0 ? 'brand' : 'neutral'" [dot]="false">{{ supplier.purchasesCount }} compra(s)</rms-status-badge>
+      </div>
+
+      <dl class="detail__list">
+        <div><dt>Contacto</dt><dd>{{ supplier.contactName || '—' }}</dd></div>
+        <div><dt>Teléfono</dt><dd>{{ supplier.phone || '—' }}</dd></div>
+        <div><dt>Correo</dt><dd>{{ supplier.email || '—' }}</dd></div>
+        <div><dt>Dirección</dt><dd>{{ supplier.address || '—' }}</dd></div>
+        <div><dt>RUC</dt><dd>{{ supplier.taxId || '—' }}</dd></div>
+        <div><dt>Registrado</dt><dd>{{ when(supplier.createdOnManagua) }}</dd></div>
+      </dl>
+
+      @if (supplier.notes) { <p class="detail__description">{{ supplier.notes }}</p> }
+
+      <h4 class="detail__title">Últimas compras</h4>
+      @if (detailLoading()) {
+        <span class="rms-skeleton rms-skeleton--block" aria-busy="true"></span>
+      } @else if (detailError(); as message) {
+        <rms-notice tone="danger" title="No pudimos cargar las compras">{{ message }}</rms-notice>
+      } @else if (detail()?.recentPurchases?.length) {
+        <ul class="detail__purchases">
+          @for (purchase of detail()!.recentPurchases; track purchase.purchaseId) {
+            <li>
+              <span><strong>{{ purchase.purchaseType === 'DevolucionProveedor' ? 'Devolución a proveedor' : 'Compra' }}</strong><small>No. {{ purchase.purchaseId }} · {{ when(purchase.createdOnManagua) }}</small></span>
+              <strong>{{ purchase.currencyCode }} {{ purchase.totalAmount }}</strong>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="detail__empty">Este proveedor todavía no tiene compras registradas.</p>
+      }
+    </div>
+    <div footer class="drawer-actions">
+      @if (canUpdate()) {
+        <a class="rms-btn rms-btn--primary drawer-actions__wide" [routerLink]="[supplier.supplierId, 'editar']" (click)="closeDetail()"><rms-cazo-icon name="edit" [size]="16" /> Editar proveedor</a>
+        <button type="button" class="rms-btn rms-btn--secondary" [disabled]="!network.online() || store.busySupplierId() === supplier.supplierId" (click)="toggleStatus(supplier)">
+          <rms-cazo-icon [name]="supplier.isActive ? 'eye-off' : 'eye'" [size]="16" /> {{ supplier.isActive ? 'Desactivar' : 'Activar' }}
+        </button>
+      }
+    </div>
+    </ng-container>
+  }
+</rms-drawer>
